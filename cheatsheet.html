@@ -1,0 +1,49 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>常用命令速查 | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门 <span>LEARN BY DOING</span></a><nav><a class="source" href="index.html">教程首页</a> &nbsp; <a class="source" href="chapters.html#docker">Docker 教程</a></nav></header><div class="layout"><aside><div class="side-title">速查目录</div><a href="#shell">命令行</a><a href="#git">Git</a><a href="#http">接口请求</a><a href="#docker">Docker</a><p>返回教程</p><a href="index.html">命令行</a><a href="chapters.html">Git 到 Docker</a></aside><main><article><section><div class="eyebrow">随用随查 / QUICK REFERENCE</div><h1>常用命令速查</h1><p class="lead">不用一次记住，遇到问题时回来查。</p><p>下面以 Mac 终端为例。命令中的 <code>文件名</code>、<code>仓库地址</code>、<code>容器名</code> 等需要替换成自己的内容。<code>#</code> 后面是说明，不需要单独输入。</p><div class="note"><strong>快速跳转：</strong> <a href="#shell">命令行</a> · <a href="#git">Git</a> · <a href="#http">接口请求</a> · <a href="#docker">Docker</a></div></section>
+<section id="shell"><div class="eyebrow">01 / 终端</div><h2>命令行</h2><h3>找文件和目录</h3><pre><code>pwd                    # 我现在在哪个目录
+ls                     # 列出当前目录内容
+ls -l                  # 查看更详细的信息
+cd 目录名              # 进入目录
+cd ..                  # 回到上一级目录
+cd ~                   # 回到用户主目录</code></pre><h3>操作文件</h3><pre><code>mkdir 目录名           # 创建目录
+touch 文件名           # 创建空文件，或更新已有文件时间
+cat 文件名             # 显示文件内容
+cp 原文件 目标文件     # 复制文件
+mv 原文件 新名称       # 移动或重命名文件</code></pre><h3>查找和排查</h3><pre><code>ls ~ | grep Doc        # 从主目录列表中筛选包含 Doc 的行
+echo "$HOME"           # 查看主目录路径
+echo "$PATH"           # 查看命令搜索路径
+which git              # 查看终端找到的 git 位置
+lsof -i :8000          # 查看使用 8000 端口的进程
+ps aux | grep python   # 查找包含 python 的进程行</code></pre><p><a href="index.html#location">返回命令行教程 →</a></p></section>
+<section id="git"><div class="eyebrow">02 / 版本管理</div><h2>Git</h2><h3>记录修改</h3><pre><code>git status                 # 查看当前修改和暂存状态
+git diff                   # 查看尚未暂存的修改
+git add 文件名             # 暂存指定文件
+git diff --staged          # 查看已暂存的修改
+git commit -m "说明修改"   # 提交暂存区的修改
+git log --oneline          # 查看简洁的提交历史</code></pre><h3>分支与远程仓库</h3><pre><code>git init                   # 把当前目录初始化为 Git 仓库
+git clone 仓库地址         # 下载远程仓库
+git switch -c 分支名       # 创建并切换到新分支
+git switch main            # 切换到 main 分支
+git merge 分支名           # 将该分支合并到当前分支
+git pull                   # 获取并整合当前分支的远程更新
+git push                   # 推送当前分支的提交</code></pre><p>首次推送新分支通常用 <code>git push -u origin 分支名</code>。合并或拉取前，先用 <code>git status</code> 查看当前状态。</p><p><a href="chapters.html#git">返回 Git 教程 →</a></p></section>
+<section id="http"><div class="eyebrow">03 / 接口调试</div><h2>接口请求</h2><pre><code>curl -i https://jsonplaceholder.typicode.com/posts/1
+# 发送 GET 请求；-i 同时显示响应头和状态码
+
+curl -i -X POST 'https://jsonplaceholder.typicode.com/posts' \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"学习接口","userId":1}'
+# 发送 JSON：-X 指定方法，-H 添加请求头，-d 提供请求体</code></pre><p><a href="chapters.html#api">返回接口调试教程 →</a></p></section>
+<section id="docker"><div class="eyebrow">04 / 容器</div><h2>Docker</h2><p>先启动 Docker Desktop。以下用教程中的 <code>study-redis</code> 作为容器名。</p><h3>查看与管理</h3><pre><code>docker info                    # 检查 Docker 引擎是否可连接
+docker ps                      # 查看运行中的容器
+docker ps -a                   # 查看所有容器，包括已停止的
+docker logs study-redis        # 查看容器输出的日志
+docker stop study-redis        # 停止容器
+docker start study-redis       # 启动已有的容器
+docker rm study-redis          # 删除已停止的容器</code></pre><div class="note"><strong>记住这个区别：</strong><code>run</code> 创建并启动新容器；<code>start</code> 启动已经存在的容器。删除容器前，先确认是否需要保存其中的数据。</div><h3>启动 Redis 并连接</h3><pre><code>docker run -d --name study-redis -p 127.0.0.1:6379:6379 redis:7
+# 创建并后台运行 Redis；左边 6379 是本机端口，右边是容器端口
+
+docker exec -it study-redis redis-cli
+# 在运行中的容器里打开 Redis 客户端</code></pre><p>进入 Redis 客户端后：</p><pre><code>PING                    # 测试连接，正常返回 PONG
+SET course "dev-tools"  # 写入一条数据
+GET course              # 读取这条数据
+EXIT                    # 退出客户端，容器继续运行</code></pre><p>如果容器名已经存在，用 <code>docker start study-redis</code> 启动已有容器；如果端口被占用，先用 <code>lsof -i :6379</code> 查看。</p><p><a href="chapters.html#docker">返回 Docker 详细教程 →</a></p></section><footer><a href="index.html">← 返回教程首页</a></footer></article><nav class="toc"><span>本页目录</span><a href="#shell">命令行</a><a href="#git">Git</a><a href="#http">接口请求</a><a href="#docker">Docker</a></nav></main></div></body></html>
