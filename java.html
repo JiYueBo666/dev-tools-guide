@@ -1,0 +1,251 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Java 入门 | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门 <span>LEARN BY DOING</span></a><nav><a class="source" href="cheatsheet.html">命令速查</a> &nbsp; <a class="source" href="https://github.com/JiYueBo666/dev-tools-guide">GitHub ↗</a></nav></header><div class="layout"><aside><div class="side-title">Java 学习路线</div><a href="#start">开始之前</a><a href="#oop">类、接口与异常</a><a href="#collections">集合</a><a href="#functional">Lambda、Stream、Optional</a><a href="#io">文件读写</a><a href="#reflection">反射与注解</a><a href="#finish">练习与回顾</a><p>返回</p><a href="index.html">开发工具首页</a><a href="chapters.html">Git 到 Docker</a></aside><main><article><section id="start"><div class="eyebrow">08 / JAVA 入门</div><h1>Java 入门：一起做一份任务清单</h1><p class="lead">假如你想写一个小程序，记下今天要做的事。任务怎么表示？多条任务放在哪里？关掉程序后，怎么留住它们？</p><p>这些问题，正好能带我们认识 Java 的常用工具。你不必一上来就记住所有名字：我们先解决一个小问题，再看看 Java 给它起了什么名字。</p><div class="note"><strong>怎么学这章？</strong> 标有文件名的示例是独立小程序；少量短代码用于解释写法，会标明是片段。先运行、观察结果，再自己改一点。如果某一节看累了，就先停在那一节；这些例子可以反复回来试。</div><h3>这章要走的路</h3><div class="table-wrap"><table><tr><th>你会遇到的问题</th><th>我们会学什么</th></tr><tr><td>怎么描述一条任务？</td><td>类、对象、方法、权限、继承和接口</td></tr><tr><td>怎么存很多条任务？</td><td>List、Set、Map、泛型和遍历</td></tr><tr><td>怎么筛选未完成的任务？</td><td>Lambda、Stream 和 Optional</td></tr><tr><td>怎么把任务保存到文件？</td><td>异常、文件读写和序列化</td></tr><tr><td>框架怎么认识我们的代码？</td><td>反射和注解</td></tr></table></div><h3>先让 Java 跑起来</h3><p>我们需要 <strong>JDK</strong>：它提供编译和运行 Java 程序所需的工具。先打开终端，检查一下：</p>
+<pre><code>java -version      # 查看运行 Java 程序的工具
+javac -version     # 查看 Java 编译器</code></pre>
+<p>如果都能显示版本号，就可以继续。建议使用 JDK 17 或更新的版本；如果提示找不到 Java，可以到 <a href="https://adoptium.net/temurin/releases/">Eclipse Temurin 下载页</a>下载并安装适合自己电脑的 JDK。Mac 用户安装时留意处理器类型，安装完成后重新打开终端，再运行上面两条命令。</p><p>接下来新建一个专门放练习的目录，并进入它：</p>
+<pre><code>mkdir -p ~/java-practice
+cd ~/java-practice</code></pre>
+<p>用编辑器新建 <code>Hello.java</code>，写入下面的内容：</p>
+<pre><code>public class Hello {
+    public static void main(String[] args) {
+        System.out.println(&quot;你好，Java！&quot;);
+    }
+}</code></pre>
+<p>保存后，在刚才的终端里运行：</p>
+<pre><code>javac -encoding UTF-8 Hello.java  # 把源代码编译成 Hello.class
+java Hello                       # 运行这个程序，不要加 .java</code></pre>
+<p>如果看到“你好，Java！”，说明程序跑通了。<code>main</code> 是这个小程序的入口，Java 从这里开始执行；<code>println</code> 把内容输出到屏幕。现在不必急着记住每个词。</p><div class="note"><strong>后面怎么运行？</strong> 每个例子的标题都会写文件名。把代码单独保存到该文件中，然后像刚才一样运行 <code>javac -encoding UTF-8 文件名.java</code>，再运行 <code>java 文件名</code>（不带 <code>.java</code>）。不要把不同示例的代码拼进同一个文件。</div></section>
+<section id="oop"><div class="eyebrow">08 / JAVA 入门</div><h2>先认识一条任务</h2><p>想想一条待办事项需要什么：一个标题，以及它是否已经完成。我们可以先把这些信息放到一起。</p>
+<h3>8.1 类与对象：先画样子，再创建一条任务</h3><p>把下面的代码保存为 <code>TaskDemo.java</code>：</p>
+<pre><code>class Task {
+    String title;
+    boolean done;
+
+    Task(String title) {
+        this.title = title;
+        this.done = false;
+    }
+
+    void complete() {
+        done = true;
+    }
+}
+
+public class TaskDemo {
+    public static void main(String[] args) {
+        Task task = new Task(&quot;学习 Java&quot;);
+        System.out.println(task.title + &quot;：&quot; + task.done);
+        task.complete();
+        System.out.println(task.title + &quot;：&quot; + task.done);
+    }
+}</code></pre>
+<p>运行后，先看到 <code>学习 Java：false</code>，再看到 <code>学习 Java：true</code>。我们做了什么？<code>class Task</code> 描述任务有哪些数据和能做什么；<code>new Task("学习 Java")</code> 按这个描述创建一条具体任务；<code>complete()</code> 把它标记为完成。</p><p><strong>类</strong>是描述，<strong>对象</strong>是创建出来的具体东西。<code>title</code> 和 <code>done</code> 是对象保存的数据；<code>complete</code> 是它能做的事，也叫<strong>方法</strong>。<code>Task(String title)</code> 是创建对象时调用的构造方法，<code>this.title</code> 指当前对象的标题，右边的 <code>title</code> 是传进来的值。</p><h3>8.2 权限：哪些地方可以访问？</h3><p>想象任务有一个重要的截止日期，不希望别的代码随手改成不合理的值。这时可以把数据藏起来，只留受控制的入口：</p>
+<pre><code>class Deadline {
+    private int days;
+
+    public void setDays(int days) {
+        if (days &gt;= 0) {
+            this.days = days;
+        }
+    }
+
+    public int getDays() {
+        return days;
+    }
+}</code></pre>
+<p>这是一个片段，用来认识写法：<code>private</code> 表示只能在这个类内部直接访问；<code>public</code> 表示其他代码也可以访问。外部通过 <code>setDays</code> 修改，可以先检查数字；通过 <code>getDays</code> 读取。还有 <code>protected</code> 和不写修饰符的情况，先记住实际阅读时留意访问范围即可。</p><h3>8.3 继承、多态与接口：同一个动作，不同做法</h3><p>完成任务后，我们也许想提醒自己：一种提醒打印在终端，另一种提醒发送到别处。先规定“提醒”这件事，再让不同类各自实现它。</p><p>保存为 <code>NoticeDemo.java</code>：</p>
+<pre><code>interface Notifier {
+    void send(String message);
+}
+
+class ConsoleNotifier implements Notifier {
+    public void send(String message) {
+        System.out.println(&quot;终端提醒：&quot; + message);
+    }
+}
+
+class QuietNotifier implements Notifier {
+    public void send(String message) {
+        System.out.println(&quot;安静记录：&quot; + message);
+    }
+}
+
+public class NoticeDemo {
+    static void remind(Notifier notifier) {
+        notifier.send(&quot;喝杯水&quot;);
+    }
+
+    public static void main(String[] args) {
+        remind(new ConsoleNotifier());
+        remind(new QuietNotifier());
+    }
+}</code></pre>
+<p><strong>接口</strong> <code>Notifier</code> 约定了 <code>send</code> 这个动作；两个类通过 <code>implements</code> 给出不同做法。<code>remind</code> 只要求拿到一个 <code>Notifier</code>，传入不同对象时，就会执行各自的 <code>send</code>。这就是这里的<strong>多态</strong>：相同的调用方式，可以对应不同实现。</p><p><strong>继承</strong>则是从一个已有类出发，复用和扩展它。<strong>抽象类</strong>适合放一些共同的数据或行为，同时留下需要子类自己完成的部分。例如：</p>
+<pre><code>abstract class TaskBase {
+    String title;
+    TaskBase(String title) { this.title = title; }
+    abstract void show();
+}
+
+class SimpleTask extends TaskBase {
+    SimpleTask(String title) { super(title); }
+    void show() { System.out.println(title); }
+}</code></pre>
+<p><code>extends</code> 表示继承；<code>super(title)</code> 调用父类的构造方法。抽象类不能直接 <code>new TaskBase(...)</code>，这里要创建的是 <code>SimpleTask</code>。接口更侧重约定能做什么；抽象类还可以集中放子类共用的状态和实现。</p><h3>8.4 枚举：给有限的选项起名字</h3><p>如果任务状态只允许“待办、已完成”，就不用到处手写字符串：</p>
+<pre><code>enum Status { TODO, DONE }
+Status status = Status.TODO;  // 在方法中使用
+System.out.println(status);   // TODO</code></pre>
+<p>这也是片段。枚举把固定选项列出来，代码里使用 <code>Status.TODO</code>，就不容易把状态写错。</p><h3>8.5 异常：出错时程序怎么告诉我们</h3><p>例如用户输入的天数应该是数字，却输入了“明天”。Java 可以用<strong>异常</strong>表示这次操作失败，我们也可以接住异常，给出更容易理解的提示。</p><p>保存为 <code>ExceptionDemo.java</code>：</p>
+<pre><code>public class ExceptionDemo {
+    public static void main(String[] args) {
+        String input = &quot;明天&quot;;
+        try {
+            int days = Integer.parseInt(input);
+            System.out.println(&quot;还有 &quot; + days + &quot; 天&quot;);
+        } catch (NumberFormatException e) {
+            System.out.println(&quot;请输入数字，例如 3。&quot;);
+        } finally {
+            System.out.println(&quot;输入检查结束。&quot;);
+        }
+    }
+}</code></pre>
+<p><code>try</code> 放可能出错的操作；匹配到 <code>NumberFormatException</code> 时执行 <code>catch</code>；<code>finally</code> 通常用于收尾。把 <code>input</code> 改成 <code>"3"</code> 再运行，看看变化。</p><p>读代码时还会看到 <code>throws</code>：它写在方法声明上，表示方法可能把异常交给调用方处理。Java 中有些异常要求编译时处理或声明，例如文件读写的 <code>IOException</code>；<code>RuntimeException</code> 及其子类通常不强制这样做。遇到异常先读类型和消息，找到出错行，再决定怎么处理。</p><div class="exercise"><span>试一试</span><h3>为任务增加一个动作</h3><p>回到 <code>TaskDemo</code>，增加一个 <code>reopen()</code> 方法，把 <code>done</code> 改回 <code>false</code>。调用它并打印结果。</p></div>
+</section>
+<section id="collections"><div class="eyebrow">08 / JAVA 入门</div><h2>任务多了，放在哪里？</h2><p>一条任务可以存在一个变量里。十条呢？我们需要一个容器来装它们。Java 常用的容器有 List、Set 和 Map。</p>
+<div class="table-wrap"><table><tr><th>容器</th><th>适合装什么</th><th>例子</th></tr><tr><td>List</td><td>按顺序排列的东西，可以重复</td><td>待办清单</td></tr><tr><td>Set</td><td>不想重复的东西</td><td>任务标签</td></tr><tr><td>Map</td><td>通过一个键找到对应的值</td><td>任务编号 → 任务标题</td></tr></table></div><h3>8.6 List、Set 与 Map</h3><p>保存为 <code>CollectionDemo.java</code>：</p>
+<pre><code>import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+public class CollectionDemo {
+    public static void main(String[] args) {
+        List&lt;String&gt; tasks = new ArrayList&lt;&gt;();
+        tasks.add(&quot;喝水&quot;);
+        tasks.add(&quot;学习 Java&quot;);
+        tasks.add(&quot;喝水&quot;);
+        System.out.println(tasks);  // 保留顺序，也保留重复项
+
+        Set&lt;String&gt; tags = new HashSet&lt;&gt;();
+        tags.add(&quot;学习&quot;);
+        tags.add(&quot;学习&quot;);
+        System.out.println(tags.size());  // 1
+
+        Map&lt;Integer, String&gt; names = new HashMap&lt;&gt;();
+        names.put(1, &quot;喝水&quot;);
+        names.put(2, &quot;学习 Java&quot;);
+        System.out.println(names.get(2));  // 学习 Java
+    }
+}</code></pre>
+<p><code>List&lt;String&gt;</code> 里的 <code>&lt;String&gt;</code> 叫<strong>泛型</strong>：告诉 Java 这个列表装字符串。<code>Map&lt;Integer, String&gt;</code> 则表示键是整数、值是字符串。这样类型不匹配时，编译器就能帮我们发现很多错误。</p><p><code>HashSet</code> 和 <code>HashMap</code> 不保证按添加顺序显示。常见的做法是用接口类型（如 <code>List</code>）声明变量，用具体实现（如 <code>ArrayList</code>）创建对象。</p><h3>8.7 HashMap 为什么能按键查找？</h3><p>可以把它想成一排抽屉：给定一个键，HashMap 会利用这个键的哈希值找到可能的位置，再用相等性判断确认是不是要找的键。不同键可能算到同一个位置，这叫<strong>哈希冲突</strong>，它会进一步区分这些键。</p><p>所以，如果自己写的类要作为 HashMap 的键，通常需要正确配合实现 <code>equals</code> 和 <code>hashCode</code>：判断相等的对象必须有相同的哈希值。普通字符串和整数已经提供了这些行为。</p><h3>8.8 遍历：一个一个看</h3><p>最直观的遍历方式是 <code>for-each</code>：</p>
+<pre><code>for (String task : tasks) {
+    System.out.println(task);
+}</code></pre>
+<p>如果遍历时还需要删除，可以使用迭代器。下面是一个独立程序，保存为 <code>IteratorDemo.java</code>：</p>
+<pre><code>import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+public class IteratorDemo {
+    public static void main(String[] args) {
+        List&lt;String&gt; tasks = new ArrayList&lt;&gt;(List.of(&quot;喝水&quot;, &quot;休息&quot;, &quot;学习&quot;));
+        Iterator&lt;String&gt; it = tasks.iterator();
+        while (it.hasNext()) {
+            String task = it.next();
+            if (task.equals(&quot;休息&quot;)) {
+                it.remove();
+            }
+        }
+        System.out.println(tasks);  // [喝水, 学习]
+    }
+}</code></pre>
+<p><code>hasNext()</code> 看还有没有下一项；<code>next()</code> 取出下一项；<code>it.remove()</code> 删除刚取出的项。遍历普通集合时直接调用集合的 <code>remove</code>，可能触发 <code>ConcurrentModificationException</code>；名字里虽然有“并发”，单线程中这样修改也可能遇到。</p><div class="exercise"><span>试一试</span><h3>给任务编号</h3><p>用 Map 保存三个“编号 → 标题”，然后通过编号取出其中一个。再用 Set 放入两个相同的标签，看看最终有几项。</p></div>
+</section>
+<section id="functional"><div class="eyebrow">08 / JAVA 入门</div><h2>从清单里挑出想要的任务</h2><p>假设你只想看包含“学习”的任务。除了写循环，Java 也提供了一种把“怎么筛选”写得更紧凑的方式。</p>
+<h3>8.9 Lambda：把一个小动作交出去</h3><p>保存为 <code>StreamDemo.java</code>：</p>
+<pre><code>import java.util.List;
+import java.util.Optional;
+
+public class StreamDemo {
+    public static void main(String[] args) {
+        List&lt;String&gt; tasks = List.of(&quot;学习 Java&quot;, &quot;喝水&quot;, &quot;学习 Git&quot;);
+        List&lt;String&gt; result = tasks.stream()
+                .filter(task -&gt; task.contains(&quot;学习&quot;))
+                .toList();
+        System.out.println(result);
+
+        Optional&lt;String&gt; first = tasks.stream()
+                .filter(task -&gt; task.contains(&quot;Docker&quot;))
+                .findFirst();
+        System.out.println(first.orElse(&quot;没有找到&quot;));
+    }
+}</code></pre>
+<p>先看 <code>task -&gt; task.contains("学习")</code>：箭头左边是拿到的一条任务，右边是对它做的判断。它的意思可以读作“给我一条 task，看看它是否包含学习”。这种简短地描述一个动作的写法叫 <strong>Lambda</strong>。</p><h3>8.10 Stream：一步一步处理</h3><p>再顺着整条代码读：从 <code>tasks</code> 创建一个 Stream；<code>filter</code> 只留下符合条件的项；<code>toList()</code> 把结果收集成列表。因此第一行输出包含两条学习任务。原来的 <code>tasks</code> 没被这段筛选修改。</p><p>常见的还有 <code>map</code>（把每一项变成另一种形式）和 <code>count</code>（计数）。例如 <code>tasks.stream().filter(t -&gt; t.contains("学习")).count()</code> 的结果是 2。这里的 <code>toList()</code> 需要 Java 16 或更新版本，因此前面建议使用 JDK 17 或更新版本。</p><h3>8.11 Optional：结果可能没有</h3><p>第二次筛选找不到 Docker。<code>findFirst()</code> 返回 <code>Optional</code>，表示结果可能有，也可能没有。<code>orElse("没有找到")</code> 表示有值就取值，没有就用这句提示。所以第二行输出“没有找到”。</p><div class="exercise"><span>试一试</span><h3>改一个筛选条件</h3><p>把 <code>Docker</code> 改成 <code>Java</code> 再运行。你觉得第二行会输出什么？</p></div>
+</section>
+<section id="io"><div class="eyebrow">08 / JAVA 入门</div><h2>关掉程序后，怎么留下任务？</h2><p>现在任务都存在程序内存里，程序结束后就没了。把它们写进文件，下次就能再读回来。</p>
+<h3>8.12 先写入，再读出</h3><p>保存为 <code>FileDemo.java</code>，在练习目录中运行：</p>
+<pre><code>import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+public class FileDemo {
+    public static void main(String[] args) {
+        Path file = Path.of(&quot;tasks.txt&quot;);
+        List&lt;String&gt; tasks = List.of(&quot;学习 Java&quot;, &quot;喝水&quot;);
+        try {
+            Files.write(file, tasks, StandardCharsets.UTF_8);
+            List&lt;String&gt; saved = Files.readAllLines(file, StandardCharsets.UTF_8);
+            for (String task : saved) {
+                System.out.println(task);
+            }
+        } catch (IOException e) {
+            System.out.println(&quot;文件读写失败：&quot; + e.getMessage());
+        }
+    }
+}</code></pre>
+<p><code>Path</code> 描述文件位置；<code>Files.write</code> 写入多行文本；<code>Files.readAllLines</code> 一次读回所有行。<code>UTF_8</code> 指明文字编码，让中文按同一种方式写入和读取。这里的相对路径 <code>tasks.txt</code> 是相对于你运行命令时所在的目录。</p><div class="note"><strong>留意：</strong>这个示例每次运行都会覆盖练习目录里的 <code>tasks.txt</code>。先确认那里没有需要保留的同名文件。</div><h3>8.13 字节流和字符流有什么区别？</h3><p>文件在底层是一串字节。处理图片、压缩包等原始数据时，通常用<strong>字节流</strong>；处理文字时，可以用理解文字编码的<strong>字符流</strong>。把字符变成字节、或者反过来，都需要知道编码方式，比如 UTF-8。</p><p>文件很大时，不一定要一次读完。<code>BufferedReader</code> 可以一行一行读；<code>try (...)</code> 会在用完后自动关闭读取器：</p>
+<pre><code>try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+    String line;
+    while ((line = reader.readLine()) != null) {
+        System.out.println(line);
+    }
+} catch (IOException e) {
+    System.out.println(&quot;读取失败：&quot; + e.getMessage());
+}</code></pre>
+<p>这是片段：要放在方法内部，并引入 <code>java.io.BufferedReader</code> 等类型，<code>file</code> 可以沿用上面的 <code>Path</code>。<code>readLine()</code> 读到文件末尾时返回 <code>null</code>，循环就结束。</p><h3>8.14 序列化：把数据变成能保存或传输的形式</h3><p>一个任务对象住在程序内存里；想存进文件或发送给另一个程序，需要先把它转成双方能理解的格式，这个过程通常称为<strong>序列化</strong>。把保存的数据重新变回程序里的数据，则叫反序列化。</p><p>例如，把任务写成 JSON：<code>{"title":"喝水","done":false}</code>。项目之间交换数据经常使用 JSON；Java 自带的对象序列化也是一种机制。这里先记住用途，等写接口时再结合实际格式动手。</p><div class="exercise"><span>试一试</span><h3>给文件加一条任务</h3><p>在 <code>FileDemo</code> 的列表中增加一条任务，重新运行，然后打开 <code>tasks.txt</code> 看看。为什么每次修改列表后文件内容会跟着变化？</p></div>
+</section>
+<section id="reflection"><div class="eyebrow">08 / JAVA 入门</div><h2>框架怎么知道你的类里有什么？</h2><p>你可能见过：写一个类、加几个标记，框架就能识别它。这里面常会用到反射和注解。先通过一个很小的例子看它们各做什么。</p>
+<h3>8.15 反射：运行时查看类的信息</h3><p>保存为 <code>ReflectionDemo.java</code>：</p>
+<pre><code>import java.lang.reflect.Method;
+
+class Greeting {
+    public void sayHello() {
+        System.out.println(&quot;你好！&quot;);
+    }
+}
+
+public class ReflectionDemo {
+    public static void main(String[] args) throws Exception {
+        Class&lt;Greeting&gt; type = Greeting.class;
+        Method method = type.getMethod(&quot;sayHello&quot;);
+        Greeting greeting = new Greeting();
+        method.invoke(greeting);
+    }
+}</code></pre>
+<p><code>Greeting.class</code> 拿到这个类的描述；<code>getMethod("sayHello")</code> 查找公开方法；<code>invoke</code> 在对象上调用它，最终输出“你好！”。这里用 <code>throws Exception</code> 把可能发生的异常交给调用方，方便集中看反射过程。</p><p>平时我们完全可以直接写 <code>greeting.sayHello()</code>。框架之所以需要反射，是因为它往往要处理你以后才写出来的类：在运行时查看类有哪些信息、按规则创建对象或调用方法。</p><h3>8.16 注解：给代码加一个标记</h3><p>你可能见过 <code>@Override</code>。把它写在方法上，表示这个方法要重写父类或接口中的方法，编译器会帮忙检查：</p>
+<pre><code>class Animal {
+    void speak() { System.out.println(&quot;动物发声&quot;); }
+}
+class Dog extends Animal {
+    @Override
+    void speak() { System.out.println(&quot;汪&quot;); }
+}</code></pre>
+<p>注解可以理解为附在代码上的额外信息。<code>@Override</code> 由编译器检查；框架中的某些注解则会在运行时被框架读取，例如用来标记某个类应由框架管理。不同注解的作用要看它的定义；写上标记之后，仍然需要相应的编译器、工具或框架去识别和处理它。</p><div class="exercise"><span>试一试</span><h3>换一句问候</h3><p>在 <code>ReflectionDemo</code> 里把 <code>sayHello</code> 输出的文字改掉，运行看看。再想想：示例里是哪一行按名字找到了方法？</p></div>
+</section>
+<section id="finish"><div class="eyebrow">08 / JAVA 入门</div><h2>把这些知识连起来</h2><p>回头看这份学习任务清单：一条任务可以用对象表示，多条任务可以放进集合；想筛选就用循环或 Stream；想留下来就写入文件；遇到不正常的输入则处理异常。</p>
+<p>你现在可以动手做一个小练习：在终端程序中维护几条任务，打印全部任务，再筛选出包含“学习”的任务，最后把结果写入文件。先从固定的列表开始，等熟悉之后再考虑让用户输入。</p><p>这章先把基础用起来。更深入的并发、JVM 内存调优、类加载、动态代理和复杂网络编程，可以等做项目时遇到具体问题再回来学。</p><div class="note"><strong>遇到卡住的地方</strong>：把你运行的代码、终端输出和你原本以为会发生什么带回来，我们一起看。</div><p><a href="chapters.html#docker">← 返回 Docker</a> · <a href="cheatsheet.html">查看命令速查</a></p>
+</section>
+<footer>Java 入门 · 从问题出发，慢慢学</footer></article><nav class="toc"><span>本页目录</span><a href="#start">开始之前</a><a href="#oop">类与异常</a><a href="#collections">集合</a><a href="#functional">函数式写法</a><a href="#io">文件读写</a><a href="#reflection">反射与注解</a><a href="#finish">回顾</a></nav></main></div></body></html>
