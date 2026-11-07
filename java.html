@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Java 入门 | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门 <span>LEARN BY DOING</span></a><nav><a class="source" href="cheatsheet.html">命令速查</a> &nbsp; <a class="source" href="https://github.com/JiYueBo666/dev-tools-guide">GitHub ↗</a></nav></header><div class="layout"><aside><div class="side-title">Java 学习路线</div><a href="#start">开始之前</a><a href="#oop">类、接口与异常</a><a href="#collections">集合</a><a href="#functional">Lambda、Stream、Optional</a><a href="#io">文件读写</a><a href="#reflection">反射与注解</a><a href="#finish">练习与回顾</a><p>返回</p><a href="index.html">开发工具首页</a><a href="chapters.html">Git 到 Docker</a></aside><main><article><section id="start"><div class="eyebrow">08 / JAVA 入门</div><h1>Java 入门：一起做一份任务清单</h1><p class="lead">假如你想写一个小程序，记下今天要做的事。任务怎么表示？多条任务放在哪里？关掉程序后，怎么留住它们？</p><p>这些问题，正好能带我们认识 Java 的常用工具。你不必一上来就记住所有名字：我们先解决一个小问题，再看看 Java 给它起了什么名字。</p><div class="note"><strong>怎么学这章？</strong> 标有文件名的示例是独立小程序；少量短代码用于解释写法，会标明是片段。先运行、观察结果，再自己改一点。如果某一节看累了，就先停在那一节；这些例子可以反复回来试。</div><h3>这章要走的路</h3><div class="table-wrap"><table><tr><th>你会遇到的问题</th><th>我们会学什么</th></tr><tr><td>怎么描述一条任务？</td><td>类、对象、方法、权限、继承和接口</td></tr><tr><td>怎么存很多条任务？</td><td>List、Set、Map、泛型和遍历</td></tr><tr><td>怎么筛选未完成的任务？</td><td>Lambda、Stream 和 Optional</td></tr><tr><td>怎么把任务保存到文件？</td><td>异常、文件读写和序列化</td></tr><tr><td>框架怎么认识我们的代码？</td><td>反射和注解</td></tr></table></div><h3>先让 Java 跑起来</h3><p>我们需要 <strong>JDK</strong>：它提供编译和运行 Java 程序所需的工具。先打开终端，检查一下：</p>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Java 入门 | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门 <span>LEARN BY DOING</span></a><nav><a class="source" href="cheatsheet.html">命令速查</a> &nbsp; <a class="source" href="https://github.com/JiYueBo666/dev-tools-guide">GitHub ↗</a></nav></header><div class="layout"><aside><div class="side-title">Java 学习路线</div><a href="#start">开始之前</a><a href="#structure">Java 程序的结构</a><a href="#oop">类、接口与异常</a><a href="#collections">集合</a><a href="#functional">Lambda、Stream、Optional</a><a href="#io">文件读写</a><a href="#reflection">反射与注解</a><a href="#finish">练习与回顾</a><p>返回</p><a href="index.html">开发工具首页</a><a href="chapters.html">Git 到 Docker</a></aside><main><article><section id="start"><div class="eyebrow">08 / JAVA 入门</div><h1>Java 入门：一起做一份任务清单</h1><p class="lead">假如你想写一个小程序，记下今天要做的事。任务怎么表示？多条任务放在哪里？关掉程序后，怎么留住它们？</p><p>这些问题，正好能带我们认识 Java 的常用工具。你不必一上来就记住所有名字：我们先解决一个小问题，再看看 Java 给它起了什么名字。</p><div class="note"><strong>怎么学这章？</strong> 标有文件名的示例是独立小程序；少量短代码用于解释写法，会标明是片段。先运行、观察结果，再自己改一点。如果某一节看累了，就先停在那一节；这些例子可以反复回来试。</div><h3>这章要走的路</h3><div class="table-wrap"><table><tr><th>你会遇到的问题</th><th>我们会学什么</th></tr><tr><td>怎么描述一条任务？</td><td>类、对象、方法、权限、继承和接口</td></tr><tr><td>怎么存很多条任务？</td><td>List、Set、Map、泛型和遍历</td></tr><tr><td>怎么筛选未完成的任务？</td><td>Lambda、Stream 和 Optional</td></tr><tr><td>怎么把任务保存到文件？</td><td>异常、文件读写和序列化</td></tr><tr><td>框架怎么认识我们的代码？</td><td>反射和注解</td></tr></table></div><h3>先让 Java 跑起来</h3><p>我们需要 <strong>JDK</strong>：它提供编译和运行 Java 程序所需的工具。先打开终端，检查一下：</p>
 <pre><code>java -version      # 查看运行 Java 程序的工具
 javac -version     # 查看 Java 编译器</code></pre>
 <p>如果都能显示版本号，就可以继续。建议使用 JDK 17 或更新的版本；如果提示找不到 Java，可以到 <a href="https://adoptium.net/temurin/releases/">Eclipse Temurin 下载页</a>下载并安装适合自己电脑的 JDK。Mac 用户安装时留意处理器类型，安装完成后重新打开终端，再运行上面两条命令。</p><p>接下来新建一个专门放练习的目录，并进入它：</p>
@@ -14,6 +14,82 @@ cd ~/java-practice</code></pre>
 <pre><code>javac -encoding UTF-8 Hello.java  # 把源代码编译成 Hello.class
 java Hello                       # 运行这个程序，不要加 .java</code></pre>
 <p>如果看到“你好，Java！”，说明程序跑通了。<code>main</code> 是这个小程序的入口，Java 从这里开始执行；<code>println</code> 把内容输出到屏幕。现在不必急着记住每个词。</p><div class="note"><strong>后面怎么运行？</strong> 每个例子的标题都会写文件名。把代码单独保存到该文件中，然后像刚才一样运行 <code>javac -encoding UTF-8 文件名.java</code>，再运行 <code>java 文件名</code>（不带 <code>.java</code>）。不要把不同示例的代码拼进同一个文件。</div></section>
+<section id="structure"><div class="eyebrow">先别急着往下学</div><h2>一份 Java 程序，到底是怎么组成的？</h2>
+<p>刚才我们运行了 <code>Hello.java</code>。但你可能还有一个疑问：为什么代码要放在 <code>class</code> 里？<code>main</code> 那一长串又是做什么的？我们把程序拆开看看。</p>
+<h3>先看整体：从外到里有三层</h3>
+<pre><code>Hello.java                 一个源代码文件
+└── class Hello             文件中的一个类
+    └── main 方法          程序启动时执行的入口
+        └── 一条条语句     比如打印一句话</code></pre>
+<p>可以把<strong>类</strong>想成一个用来组织代码的盒子，<strong>方法</strong>是盒子里的一组动作。我们直接从终端启动这个小程序时，Java 会找到指定类中的 <code>main</code> 方法，从里面开始执行。</p>
+<h3>第一层：文件和类</h3>
+<p>先重新看这个完整例子，文件名是 <code>Hello.java</code>：</p>
+<pre><code>public class Hello {
+    public static void main(String[] args) {
+        System.out.println("你好，Java！");
+    }
+}</code></pre>
+<p>第一行的 <code>class Hello</code> 是在定义一个叫 <code>Hello</code> 的类。紧跟着的 <code>{</code> 表示类的内容从这里开始；最后的 <code>}</code> 表示结束。中间的 <code>main</code> 就在这个类里面。</p>
+<p>这里类名前面有 <code>public</code>，因此文件要叫 <code>Hello.java</code>：类名和文件名必须一致，大小写也要一致。一个源文件里可以有多个类，但最多只能有一个 <code>public</code> 的顶层类。</p>
+<h3>第二层：main 方法</h3>
+<p>再看这行：</p>
+<pre><code>public static void main(String[] args) {</code></pre>
+<p>它是在定义一个叫 <code>main</code> 的方法。先把它当作 Java 启动普通命令行程序时约定好的入口，暂时照这个写。你也可以先认识每一部分：</p>
+<div class="table-wrap"><table><tr><th>写法</th><th>现在可以这样理解</th></tr><tr><td><code>public</code></td><td>允许外部访问，Java 启动程序时才能调用它。</td></tr><tr><td><code>static</code></td><td>属于类本身；启动时不需要先创建 <code>Hello</code> 对象。</td></tr><tr><td><code>void</code></td><td>这个方法执行完不会返回一个值。</td></tr><tr><td><code>main</code></td><td>方法名；作为入口时要写对这个名字。</td></tr><tr><td><code>String[] args</code></td><td>接收启动程序时传进来的文字参数；没有参数也要保留这个写法。</td></tr></table></div>
+<p>方法后面的 <code>{ ... }</code> 圈出它要执行的内容。类有一对花括号，方法里面又有一对；就像大盒子里放了一个小盒子。缩进帮助人看清层次，但真正划分范围的是花括号。</p>
+<h3>第三层：方法里的语句</h3>
+<pre><code>System.out.println("你好，Java！");</code></pre>
+<p>这是一条语句：让程序在终端打印引号里的文字，打印后换行。双引号表示这里是一段文字；末尾的分号 <code>;</code> 表示这条语句结束。</p>
+<p>我们可以再加一条：</p>
+<pre><code>public class Hello {
+    public static void main(String[] args) {
+        System.out.println("你好，Java！");
+        System.out.println("今天开始学习。");
+    }
+}</code></pre>
+<p>再次运行时，程序会从上到下执行这两条语句，终端出现两行文字。</p>
+<h3>方法不只有 main</h3>
+<p>当一段动作需要多次使用时，可以给它单独起个名字。下面是一个完整例子，请保存为 <code>Greeting.java</code>：</p>
+<pre><code>public class Greeting {
+    public static void main(String[] args) {
+        sayHello("小明");
+        sayHello("小红");
+    }
+
+    static void sayHello(String name) {
+        System.out.println("你好，" + name + "！");
+    }
+}</code></pre>
+<p>这个类里有两个方法：<code>main</code> 和 <code>sayHello</code>。程序从 <code>main</code> 进入，执行 <code>sayHello("小明")</code> 时，文字“小明”被交给 <code>name</code>，然后打印“你好，小明！”。第二次用同样的方式打印“小红”。</p>
+<p><code>String name</code> 表示这个方法接收一段文字，称为<strong>参数</strong>；<code>+</code> 在这里把几段文字拼起来。<code>sayHello</code> 写在 <code>main</code> 的后面也没关系：Java 先认识类中的方法，运行时仍然从 <code>main</code> 开始。</p>
+<h3>一份文件里，还可能看见 import 和 package</h3>
+<p>等你读到后面的集合示例，会看到这样的结构：</p>
+<pre><code>import java.util.ArrayList;
+import java.util.List;
+
+public class ShoppingList {
+    public static void main(String[] args) {
+        List&lt;String&gt; items = new ArrayList&lt;&gt;();
+        items.add("苹果");
+        System.out.println(items);
+    }
+}</code></pre>
+<p>这是一个完整例子，保存为 <code>ShoppingList.java</code> 可以运行。<code>List</code> 和 <code>ArrayList</code> 是 Java 已经提供的工具，开头的 <code>import</code> 告诉编译器我们要使用哪些类；后面的章节会仔细讲它们。不是每个文件都需要 <code>import</code>，比如之前的 <code>Hello.java</code> 就没有。</p>
+<p>有些项目还会在文件最上方写 <code>package</code>，用来表明这个类属于哪个包，可以把包暂时想成给代码分类的名字。我们现在练习的小程序先不写 <code>package</code>，后面做项目时再结合目录学习。</p>
+<h3>从代码到运行，中间发生了什么？</h3>
+<div class="flow">Hello.java <b>→ javac 编译 →</b> Hello.class <b>→ java 运行 →</b> 终端输出</div>
+<p>以没有写 <code>package</code> 的 <code>Hello.java</code> 为例，在<strong>文件所在的目录</strong>执行：</p>
+<pre><code>pwd                              # 看当前在哪个目录
+ls                               # 确认能看到 Hello.java
+javac -encoding UTF-8 Hello.java # 编译源代码
+ls                               # 编译成功后通常能看到 Hello.class
+java Hello                       # 运行 Hello 类</code></pre>
+<p><code>javac</code> 读取你写的 <code>.java</code> 文件，检查语法并生成 <code>.class</code> 文件。这个文件里是 Java 字节码，可以交给 Java 虚拟机运行。随后 <code>java Hello</code> 找到 <code>Hello</code> 类，启动它的 <code>main</code> 方法。</p>
+<p><strong>文件名要分清：</strong>编译时写 <code>Hello.java</code>，因为交给 <code>javac</code> 的是源文件；运行时写 <code>Hello</code>，因为告诉 <code>java</code> 的是类名。终端所在目录不对时，可以先用 <code>cd</code> 进入保存文件的目录。</p>
+<h3>碰到报错，先看这几处</h3>
+<div class="table-wrap"><table><tr><th>看到的问题</th><th>可以先检查</th></tr><tr><td>找不到 <code>Hello.java</code></td><td>用 <code>pwd</code> 和 <code>ls</code> 检查当前目录，确认文件已经保存且名称正确。</td></tr><tr><td>提示 public 类应放在同名文件中</td><td>确认 <code>public class Hello</code> 对应的文件名是 <code>Hello.java</code>。</td></tr><tr><td>编译时提示语法错误</td><td>先看提示的行号，再检查引号、分号和花括号有没有配对。</td></tr><tr><td>找不到或无法加载主类</td><td>先确认编译成功、当前目录有 <code>Hello.class</code>；运行命令写 <code>java Hello</code>。</td></tr></table></div>
+<div class="exercise"><span>动手试试</span><h3>让程序介绍自己</h3><p>把 <code>Hello.java</code> 改成打印两行：第一行是你的名字，第二行是“我正在学 Java”。保存后，重新编译，再运行。</p><p>然后想一想：如果你修改了 <code>.java</code> 文件，为什么要再执行一次 <code>javac</code>？</p></div>
+</section>
 <section id="oop"><div class="eyebrow">08 / JAVA 入门</div><h2>先认识一条任务</h2><p>想想一条待办事项需要什么：一个标题，以及它是否已经完成。我们可以先把这些信息放到一起。</p>
 <h3>8.1 类与对象：先画样子，再创建一条任务</h3><p>把下面的代码保存为 <code>TaskDemo.java</code>：</p>
 <pre><code>class Task {
@@ -248,4 +324,4 @@ class Dog extends Animal {
 <section id="finish"><div class="eyebrow">08 / JAVA 入门</div><h2>把这些知识连起来</h2><p>回头看这份学习任务清单：一条任务可以用对象表示，多条任务可以放进集合；想筛选就用循环或 Stream；想留下来就写入文件；遇到不正常的输入则处理异常。</p>
 <p>你现在可以动手做一个小练习：在终端程序中维护几条任务，打印全部任务，再筛选出包含“学习”的任务，最后把结果写入文件。先从固定的列表开始，等熟悉之后再考虑让用户输入。</p><p>这章先把基础用起来。更深入的并发、JVM 内存调优、类加载、动态代理和复杂网络编程，可以等做项目时遇到具体问题再回来学。</p><div class="note"><strong>遇到卡住的地方</strong>：把你运行的代码、终端输出和你原本以为会发生什么带回来，我们一起看。</div><p><a href="chapters.html#docker">← 返回 Docker</a> · <a href="cheatsheet.html">查看命令速查</a></p>
 </section>
-<footer>Java 入门 · 从问题出发，慢慢学</footer></article><nav class="toc"><span>本页目录</span><a href="#start">开始之前</a><a href="#oop">类与异常</a><a href="#collections">集合</a><a href="#functional">函数式写法</a><a href="#io">文件读写</a><a href="#reflection">反射与注解</a><a href="#finish">回顾</a></nav></main></div></body></html>
+<footer>Java 入门 · 从问题出发，慢慢学</footer></article><nav class="toc"><span>本页目录</span><a href="#start">开始之前</a><a href="#structure">Java 程序的结构</a><a href="#oop">类与异常</a><a href="#collections">集合</a><a href="#functional">函数式写法</a><a href="#io">文件读写</a><a href="#reflection">反射与注解</a><a href="#finish">回顾</a></nav></main></div></body></html>
