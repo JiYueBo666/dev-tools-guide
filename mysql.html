@@ -1,0 +1,135 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>任务清单：从 JSON 到 MySQL</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门 <span>LEARN BY DOING</span></a><nav><a class="source" href="java.html">Java 教程</a> &nbsp; <a class="source" href="cheatsheet.html">命令速查</a></nav></header><div class="layout"><aside><div class="side-title">从 JSON 到 MySQL</div><a href="#intro">我们要做什么</a><a href="#review">先回头看 JSON</a><a href="#start">启动 MySQL</a><a href="#sql">数据库与表</a><a href="#maven">Java 怎么连 MySQL</a><a href="#connect">第一次连接</a><a href="#jdbc">用 Java 读写任务</a><a href="#integrate">接回任务清单</a><a href="#trouble">遇到问题怎么办</a><p>返回教程</p><a href="java.html">Java 入门</a><a href="chapters.html#docker">Docker</a></aside><main><article><section id="intro"><div class="eyebrow">09 / 任务清单实战</div><h1>把任务从 JSON 搬到 MySQL</h1><p class="lead">你的任务清单已经能把任务存进 JSON 文件了。现在，我们来试试把它们放进数据库。</p><p>先想一想你现在的程序：添加一条任务时，要先读出整个列表，加入新任务，再把整个列表写回文件。如果任务越来越多，你想按编号找一条、按日期找今天的任务，每次都要自己处理整个列表。</p><p>MySQL 可以帮你保存一张任务表；你告诉它“加一条”或“找今天的”，它负责处理数据。这一章我们会先亲手用 MySQL 增删查，再让 Java 替我们发出同样的命令。</p><div class="note"><strong>这章怎么学？</strong> 我们沿用你已经做好的任务清单。先在旁边建一个独立的连接练习，确认能写入和读取，再把思路接回原程序。原来的 JSON 文件先留着。</div><h3>先看全程</h3><div class="flow">启动 MySQL → 建任务表 → Java 连接 → 添加与查询 → 接回清单</div><p>读完这一章，你会知道数据库、表、SQL、Maven 依赖和 JDBC 分别在做什么，也能在 Java 中真正保存一条任务。</p></section>
+<section id="review"><div class="eyebrow">09 / 任务清单实战</div><h2>先回头看：你现在的程序做了什么</h2><p>在开始之前，我们用你的代码把已经学过的东西串起来。</p>
+<p>你把任务放在 <code>List&lt;Task&gt;</code> 里。保存时，<code>save_tasks()</code> 让 Gson 把列表变成 JSON，再写入 <code>data/task.json</code>；下次启动，<code>load_tasks()</code> 读出 JSON，再交给 Gson 变回任务列表。</p><div class="flow">任务列表 → Gson 转换 → JSON 文件<br>JSON 文件 → Gson 转换 → 任务列表</div><p>Gson 是别人写好的工具。<code>pom.xml</code> 记录项目需要它，Maven 负责下载它并在编译和运行时提供给项目。MySQL 的连接工具也按同样的方式加入；你不用重新写一份 <code>pom.xml</code>。</p><p>接下来我们不会一边往 JSON 写一边往 MySQL 写。先独立验证数据库，再考虑如何切换保存方式，避免两份数据让人混淆。</p>
+</section>
+<section id="start"><div class="eyebrow">09 / 任务清单实战</div><h2>第一站：把 MySQL 启动起来</h2><p>MySQL 本身是一个提供数据服务的程序。它需要先运行起来，Java 才能连接它。我们用你学过的 Docker 启动。</p>
+<h3>1.1 先检查有没有现成容器</h3><p>打开 Docker Desktop，等它启动完成。然后在终端输入：</p>
+<pre><code>docker ps -a  # 查看所有容器，包括已经停止的</code></pre>
+<p>看 <code>NAMES</code> 一列。如果已经有 <code>study-mysql</code>，先用下面的命令启动已有容器：</p>
+<pre><code>docker start study-mysql
+docker logs study-mysql</code></pre>
+<p>如果它已经在运行，直接查看日志即可。请使用创建这个容器时设置的密码；重新运行创建命令不会替你改掉已有容器的密码。</p><h3>1.2 没有容器时，再创建一个</h3><p>如果列表里没有 <code>study-mysql</code>，运行：</p>
+<pre><code>docker run -d --name study-mysql \
+  -e MYSQL_ROOT_PASSWORD=study_password \
+  -p 127.0.0.1:3306:3306 \
+  -v study-mysql-data:/var/lib/mysql \
+  mysql:8.0</code></pre>
+<p>这条命令让 Docker 启动 MySQL 8.0。<code>study_password</code> 是本机练习用的密码；<code>3306:3306</code> 让本机可以通过 3306 端口连接容器；<code>-v</code> 给数据库使用一个具名数据卷，用来保留数据。</p><p>第一次下载镜像和初始化可能要等一会儿。用 <code>docker logs study-mysql</code> 看日志，等出现类似 <code>ready for connections</code> 的信息，再继续。如果本机 3306 被占用，创建新容器时可改用 <code>-p 127.0.0.1:3307:3306</code>；后面的 JDBC 地址也要相应改成 3307。</p><div class="note"><strong>一个容易弄混的地方：</strong>停止容器和删除容器是两回事。这里的数据卷与容器分开保存；不要删除数据卷，除非已经确定不再需要里面的数据。</div><h3>1.3 进入 MySQL</h3>
+<pre><code>docker exec -it study-mysql mysql -u root -p</code></pre>
+<p>看到 <code>Enter password:</code> 时输入密码并按回车。屏幕不会显示输入的字符，这是正常的。如果是按上面的命令新创建的容器，密码就是 <code>study_password</code>。进入后看到 <code>mysql&gt;</code>，说明你正在和 MySQL 说话。</p><p>如果日志已经显示就绪却仍连接失败，先看<a href="#trouble">本章末尾的排查表</a>。</p>
+</section>
+<section id="sql"><div class="eyebrow">09 / 任务清单实战</div><h2>第二站：亲手创建任务表</h2><p>现在我们先不用 Java，直接在 MySQL 里建好存放任务的地方。</p>
+<h3>2.1 数据库、表和一行数据是什么？</h3><p>可以把数据库想成一个文件夹，表想成文件夹里的一张表格。我们创建一个叫 <code>todo_app</code> 的数据库，里面放一张叫 <code>tasks</code> 的表；每一行代表一条任务。</p><div class="table-wrap"><table><tr><th>id</th><th>content</th><th>task_date</th></tr><tr><td>1</td><td>学习 Java</td><td>2026-11-09</td></tr><tr><td>2</td><td>整理笔记</td><td>2026-11-09</td></tr></table></div><p>在 <code>mysql&gt;</code> 后输入下面的命令。每条命令以分号结束，输入后按回车：</p>
+<pre><code>CREATE DATABASE IF NOT EXISTS todo_app
+  CHARACTER SET utf8mb4;
+USE todo_app;</code></pre>
+<p>第一条创建数据库；<code>IF NOT EXISTS</code> 表示不存在时才创建。<code>utf8mb4</code> 让它能够保存中文等文字。第二条选择接下来要使用的数据库。</p><h3>2.2 创建表</h3>
+<pre><code>CREATE TABLE IF NOT EXISTS tasks (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    content VARCHAR(255) NOT NULL,
+    task_date VARCHAR(40) NOT NULL
+);</code></pre>
+<p>逐行看：<code>id</code> 是整数编号，<code>PRIMARY KEY</code> 要求每行编号唯一，<code>AUTO_INCREMENT</code> 让数据库为新任务生成编号；<code>content</code> 保存任务文字；<code>task_date</code> 保存日期文字；<code>NOT NULL</code> 表示这一列不能为空。</p><p>这里先用文字保存日期，是为了和你目前的 <code>Task.date</code> 类型接得上。后面学习日期查询时，可以再改成数据库的 <code>DATE</code> 类型。</p><h3>2.3 自己增、查、删一次</h3>
+<pre><code>INSERT INTO tasks (content, task_date)
+VALUES (&#x27;练习 MySQL&#x27;, &#x27;2026-11-09&#x27;);
+
+SELECT id, content, task_date FROM tasks;</code></pre>
+<p><code>INSERT</code> 是添加一行；我们没有填写 <code>id</code>，因为 MySQL 会自动生成。<code>SELECT</code> 是查询，你应该看到“练习 MySQL”和它的编号。MySQL 中的一行对应你原来列表中的一个任务对象。</p><p>如果刚才的练习任务编号是 <code>1</code>，可以这样删除它；如果你的编号不是 1，请换成实际看到的编号：</p>
+<pre><code>DELETE FROM tasks WHERE id = 1;
+SELECT id, content, task_date FROM tasks;</code></pre>
+<p><code>WHERE id = 1</code> 的意思是只处理编号为 1 的那一行。不要省略 <code>WHERE</code>：没有筛选条件的删除会删除表里的所有行。</p><p>这一章沿用你现在的规则：完成任务时删除它。如果以后想保留完成历史，可以增加“是否完成”这一列，把删除改成更新状态。</p>
+</section>
+<section id="maven"><div class="eyebrow">09 / 任务清单实战</div><h2>第三站：让 Java 找到 MySQL</h2><p>你已经能在 MySQL 里输入 SQL 了。接下来，让 Java 替你发送这些命令。</p>
+<h3>3.1 JDBC 和驱动分别是什么？</h3><p><strong>JDBC</strong> 是 Java 提供的一套数据库操作方式：代码可以用它连接数据库、发送 SQL 和读取结果。具体怎么和 MySQL 沟通，则需要 MySQL 提供的<strong>驱动</strong>，名字叫 Connector/J。</p><div class="flow">你的 Java 代码 → JDBC → MySQL 驱动 → MySQL 服务</div><p>类比一下你已经用过的 Gson：Java 程序需要一个外部工具，就把它写进 <code>pom.xml</code>，交给 Maven 下载。</p><h3>3.2 在已有的 pom.xml 增加依赖</h3><p>打开项目根目录的 <code>pom.xml</code>。找到已有 Gson 的 <code>&lt;dependencies&gt;</code>，在 Gson 的 <code>&lt;/dependency&gt;</code> 后面、<code>&lt;/dependencies&gt;</code> 前面，增加下面这一段：</p>
+<pre><code>&lt;!-- 让 Java 可以连接 MySQL --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;com.mysql&lt;/groupId&gt;
+    &lt;artifactId&gt;mysql-connector-j&lt;/artifactId&gt;
+    &lt;version&gt;9.5.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+<p>加完以后，同一个 <code>&lt;dependencies&gt;</code> 里会有两段 <code>&lt;dependency&gt;</code>：一段是已有的 Gson，另一段是 MySQL 驱动。前者继续供 JSON 代码使用，后者用于连接数据库。</p><p>保存后，在<strong>包含 pom.xml 的项目目录</strong>运行：</p>
+<pre><code>mvn compile</code></pre>
+<p>第一次 Maven 会下载依赖；看到 <code>BUILD SUCCESS</code>，说明项目编译通过。如果 VS Code 仍有红线，先确认打开的是包含 <code>pom.xml</code> 的整个项目文件夹，再等待 Java 项目导入完成。MySQL 驱动坐标可在 <a href="https://dev.mysql.com/doc/connector-j/en/connector-j-installing-maven.html">MySQL 官方文档</a>查到。</p>
+</section>
+<section id="connect"><div class="eyebrow">09 / 任务清单实战</div><h2>第四站：先试着连上数据库</h2><p>这一步只检查“能不能连接”，不修改你已经写好的任务清单。</p>
+<h3>4.1 建一个单独的连接练习</h3><p>在现有项目的 <code>src/main/java</code> 里，新建文件 <code>DatabaseDemo.java</code>。把下面的代码写进去：</p>
+<pre><code>import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DatabaseDemo {
+    public static void main(String[] args) {
+        String url = &quot;jdbc:mysql://127.0.0.1:3306/todo_app&quot;;
+        String user = &quot;root&quot;;
+        String password = &quot;study_password&quot;;
+
+        try (Connection connection = DriverManager.getConnection(url, user, password)) {
+            System.out.println(&quot;连接成功！数据库：&quot; + connection.getCatalog());
+        } catch (SQLException e) {
+            System.out.println(&quot;连接失败：&quot; + e.getMessage());
+        }
+    }
+}</code></pre>
+<p>这几行分别是什么意思？</p><div class="table-wrap"><table><tr><th>代码</th><th>作用</th></tr><tr><td><code>jdbc:mysql://</code></td><td>表示通过 JDBC 连接 MySQL。</td></tr><tr><td><code>127.0.0.1:3306</code></td><td>连接你自己的电脑上 3306 端口的 MySQL。</td></tr><tr><td><code>todo_app</code></td><td>要进入的数据库名称。</td></tr><tr><td><code>getConnection(...)</code></td><td>用地址、用户名和密码建立连接。</td></tr><tr><td><code>try (...)</code></td><td>代码执行完后自动关闭连接。</td></tr></table></div><p>如果你之前创建容器时用的是其他密码，修改 <code>password</code>；如果本机端口改成了 3307，地址也改成 <code>127.0.0.1:3307</code>。示例里的密码仅用于本机练习，不要把真实密码提交到 GitHub。</p><h3>4.2 运行连接练习</h3><p>推荐在 VS Code 中打开整个 Maven 项目，等待项目加载完成，然后打开 <code>DatabaseDemo.java</code>，点击 <code>main</code> 方法上方的 <strong>Run</strong>。</p><p>也可以在项目根目录用 Maven 运行：</p>
+<pre><code>mvn compile exec:java -Dexec.mainClass=DatabaseDemo</code></pre>
+<p>正常情况下会看到 <code>连接成功！数据库：todo_app</code>。注意：即使你还开着 <code>mysql&gt;</code>，输入这条 Maven 命令也要回到<strong>普通终端</strong>；可以输入 <code>exit</code> 退出 MySQL 客户端，或者打开新的终端标签。退出客户端不会停止 MySQL 容器。</p><div class="note"><strong>如果连接失败：</strong>先不要改一大堆配置。看错误文字，再对照文末的排查表：服务是否启动、端口、密码、数据库名称是否一致。</div>
+</section>
+<section id="jdbc"><div class="eyebrow">09 / 任务清单实战</div><h2>第五站：用 Java 添加和查看任务</h2><p>连接成功以后，我们让 Java 做刚才在 MySQL 里手动做过的事：执行 INSERT 和 SELECT。</p>
+<p>为了先把过程看清楚，我们继续用独立练习文件。将 <code>DatabaseDemo.java</code> 的内容替换为下面的完整示例。它只向 <code>todo_app.tasks</code> 添加一条练习任务并打印列表；每运行一次都会再新增一条。</p>
+<pre><code>import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class DatabaseDemo {
+    public static void main(String[] args) {
+        String url = &quot;jdbc:mysql://127.0.0.1:3306/todo_app&quot;;
+        String user = &quot;root&quot;;
+        String password = &quot;study_password&quot;;
+
+        String insertSql = &quot;INSERT INTO tasks (content, task_date) VALUES (?, ?)&quot;;
+        String selectSql = &quot;SELECT id, content, task_date FROM tasks ORDER BY id&quot;;
+
+        try (Connection connection = DriverManager.getConnection(url, user, password)) {
+            // 插入一条任务
+            try (PreparedStatement insert = connection.prepareStatement(insertSql)) {
+                insert.setString(1, &quot;练习 JDBC&quot;);
+                insert.setString(2, &quot;2026-11-09&quot;);
+                int count = insert.executeUpdate();
+                System.out.println(&quot;添加了 &quot; + count + &quot; 条任务&quot;);
+            }
+
+            // 读取并打印任务
+            try (PreparedStatement query = connection.prepareStatement(selectSql);
+                 ResultSet results = query.executeQuery()) {
+                while (results.next()) {
+                    int id = results.getInt(&quot;id&quot;);
+                    String content = results.getString(&quot;content&quot;);
+                    String date = results.getString(&quot;task_date&quot;);
+                    System.out.println(id + &quot; | &quot; + content + &quot; | &quot; + date);
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println(&quot;数据库操作失败：&quot; + e.getMessage());
+        }
+    }
+}</code></pre>
+<p>保存后，用 VS Code 的 Run，或者再次在项目根目录运行：</p>
+<pre><code>mvn compile exec:java -Dexec.mainClass=DatabaseDemo</code></pre>
+<p>如果看到“添加了 1 条任务”和任务列表，说明 Java 已经能写入并读取 MySQL。你也可以回到 MySQL 客户端，执行 <code>USE todo_app;</code> 和 <code>SELECT * FROM tasks;</code>，看看它们是不是同一批数据。</p><h3>5.1 那两个问号是什么？</h3><p><code>VALUES (?, ?)</code> 是两个待填写的位置。<code>insert.setString(1, ...)</code> 填第一个位置，<code>setString(2, ...)</code> 填第二个。<code>PreparedStatement</code> 会把参数作为值处理；用它比把用户输入直接拼到 SQL 中更合适，也能避免常见的 SQL 注入问题。</p><h3>5.2 为什么要 results.next()？</h3><p>查询可能返回多行。<code>ResultSet</code> 代表这批结果，<code>next()</code> 把位置移到下一行：有下一行就返回 <code>true</code>，没有就结束循环。在每一行里，通过列名读取 <code>id</code>、<code>content</code> 和 <code>task_date</code>。</p><h3>5.3 完成任务时怎么删除？</h3><p>你的原程序把“完成”实现成删除。数据库里也可以按编号删除，SQL 写法是：</p>
+<pre><code>String sql = &quot;DELETE FROM tasks WHERE id = ?&quot;;
+try (PreparedStatement delete = connection.prepareStatement(sql)) {
+    delete.setInt(1, id);  // id 是用户输入的整数
+    int count = delete.executeUpdate();
+    System.out.println(count == 0 ? &quot;没有找到这条任务&quot; : &quot;任务已完成&quot;);
+}</code></pre>
+<p>这是一段<strong>方法内部的片段</strong>：需要已有的 <code>connection</code> 和整数 <code>id</code>。<code>executeUpdate()</code> 返回受影响的行数；为 0 表示没有匹配的任务。记得保留 <code>WHERE id = ?</code>。</p>
+</section>
+<section id="integrate"><div class="eyebrow">09 / 任务清单实战</div><h2>第六站：接回你的任务清单</h2><p>现在，数据库已经能独立工作。接回原程序时，我们一项一项替换，避免改完一大堆才不知道哪里出了问题。</p>
+<h3>6.1 先对照旧代码</h3><div class="table-wrap"><table><tr><th>现在的 JSON 版本</th><th>改成 MySQL 后</th></tr><tr><td>load_tasks：读完整个文件</td><td>执行 SELECT，需要什么任务就查询什么</td></tr><tr><td>addTask + save_tasks：加入列表并写回文件</td><td>执行 INSERT，由数据库保存新任务</td></tr><tr><td>get_next_id：遍历列表找最大编号</td><td>插入时不提供 id，由 AUTO_INCREMENT 生成</td></tr><tr><td>finish_task：从列表删除再写文件</td><td>执行带 WHERE 的 DELETE</td></tr></table></div><p>最实用的做法是新建一个类，例如 <code>TaskRepository</code>，让它专门负责与数据库交谈：添加、查询、按编号删除。菜单仍然负责询问用户要做什么，不必知道 SQL 的每个细节。</p><h3>6.2 按这个顺序接</h3><ol><li><strong>先接查询：</strong>把“查询并打印”的代码整理成一个方法，让菜单“查看全部任务”调用它。运行并确认能看到数据库里的任务。</li><li><strong>再接添加：</strong>把用户输入的内容和日期传给 INSERT，添加后重新查询确认。数据库会分配 id，所以不需要先调用 <code>get_next_id()</code>。</li><li><strong>最后接完成：</strong>把输入的编号交给 DELETE，根据返回的行数提示是否找到任务。</li><li><strong>重启检查：</strong>关闭并重启 Java 程序，确认任务仍在；再停止和启动容器，确认数据卷中的任务仍在。</li></ol><div class="note"><strong>关于已有 JSON：</strong>新数据库刚建好时是空的，原来 <code>data/task.json</code> 中的任务不会自动进入数据库。先保留文件；等新增、查询和删除都跑通后，再单独设计一次导入，不要边试验边覆盖旧数据。</div><h3>6.3 这一阶段做到什么程度？</h3><p>完成后，你应该能在自己的菜单中添加任务、查看任务、输入编号完成任务；关闭程序再打开，尚未完成的任务仍然在。JSON 文件可以留作旧数据备份。</p><div class="exercise"><span>动手做</span><h3>先完成查询</h3><p>从上面独立示例里的 <code>SELECT</code> 和 <code>while (results.next())</code> 开始，把它们整理成一个查看任务的方法，再让菜单的选项 4 调用它。先只做查询，跑通后再加写入。</p></div>
+</section>
+<section id="trouble"><div class="eyebrow">09 / 任务清单实战</div><h2>碰到问题时，先检查哪里？</h2><p>连接数据库涉及几处不同的地方。看报错时，先找出它是在说哪个环节。</p>
+<div class="table-wrap"><table><tr><th>现象</th><th>可以先做什么</th></tr><tr><td>Docker 连不上 daemon</td><td>打开 Docker Desktop，等它完全启动后再运行 <code>docker ps</code>。</td></tr><tr><td>容器名已经存在</td><td>用 <code>docker ps -a</code> 检查，已有容器用 <code>docker start study-mysql</code> 启动。</td></tr><tr><td>端口被占用</td><td>用 <code>lsof -i :3306</code> 查看。创建新容器时可改本机端口，JDBC 地址也要同步修改。</td></tr><tr><td>Access denied</td><td>检查用户名、密码；已有容器使用的是之前初始化时的密码。</td></tr><tr><td>Communications link failure / Connection refused</td><td>检查容器是否运行、MySQL 是否已初始化完成、主机和端口是否正确。</td></tr><tr><td>Unknown database 'todo_app'</td><td>回到 MySQL 客户端执行创建数据库的步骤，确认名称一致。</td></tr><tr><td>Table 'todo_app.tasks' doesn't exist</td><td>确认执行过 <code>USE todo_app</code> 和建表语句。</td></tr><tr><td>No suitable driver</td><td>检查 <code>pom.xml</code> 是否添加 Connector/J，项目是否按 Maven 方式运行；URL 是否以 <code>jdbc:mysql:</code> 开头。</td></tr></table></div><p>如果错误信息不在表里，先保留完整报错，再从第一行关键提示查起。你可以把正在执行的命令和报错一起带回来，我们接着排查。</p><p>参考：<a href="https://dev.mysql.com/doc/connector-j/en/connector-j-installing-maven.html">MySQL 驱动的 Maven 配置</a> · <a href="https://dev.mysql.com/doc/connector-j/en/connector-j-reference-jdbc-url-format.html">JDBC 连接地址</a></p>
+</section>
+<footer><a href="java.html">← 返回 Java 入门</a> · <a href="chapters.html#docker">回顾 Docker</a></footer></article><nav class="toc"><span>本页目录</span><a href="#review">回顾 JSON</a><a href="#start">启动 MySQL</a><a href="#sql">数据库与表</a><a href="#maven">添加驱动</a><a href="#connect">第一次连接</a><a href="#jdbc">读写任务</a><a href="#integrate">接回项目</a><a href="#trouble">排查问题</a></nav></main></div></body></html>
