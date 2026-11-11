@@ -1,0 +1,292 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Java 基础补充：把道理讲清楚</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="code-guide.html">读懂任务清单</a></header><div class="layout"><aside><div class="side-title">Java 基础补充</div><a href="#interface">接口与多态</a><a href="#abstract">抽象类与权限</a><a href="#generic">泛型与集合选型</a><a href="#hash">HashMap 与相等判断</a><a href="#exception">异常怎么传递</a><a href="#stream">Lambda、Stream、Optional</a><a href="#io">字节、字符与文件</a><a href="#reflection">反射与注解</a><p>返回</p><a href="java.html">Java 入门</a><a href="code-guide.html">项目代码讲解</a></aside><main><article><section><div class="eyebrow">11 / JAVA 基础补充</div><h1>把代码背后的道理讲清楚</h1><p class="lead">你已经写出了能用的任务清单。这一章从你遇到的问题出发，把基础知识补齐。</p><p>我们先讲接口，因为你已经做过 JSON 和数据库两种保存方式，它们能帮助你理解接口的用途。后面的每一节都可以单独阅读，不必一次读完。</p><div class="note">所有标为“完整小程序”的代码都只需要 JDK 17 或更新版本，无需 Maven。它们用于观察一个概念。我们先在独立目录运行，再考虑是否要用到原项目中。</div></section>
+<section id="interface"><h2>1. 接口：让调用方式保持一致</h2>
+<p>回想你的任务清单：最初把任务保存到 JSON，后来改为保存到 MySQL。菜单想做的事一直很简单——收到一条任务，然后把它保存起来。具体写到哪里，可以交给负责保存的类。</p>
+<p>如果菜单直接调用 JsonTaskStore，换成数据库时就要修改这个调用。我们可以先写下一条约定：“负责保存的类，都提供 save 方法，接收一段任务文字。”这个约定就可以写成接口。</p>
+<pre><code>interface TaskStore {
+    void save(String content);
+}</code></pre>
+<p>interface 表示接口，TaskStore 是名字。save 后面的分号表示这里只约定方法的形式。谁使用 implements 声明自己实现这个接口，谁就需要提供相应的方法。</p>
+<h3>用一个能运行的例子看调用过程</h3>
+<p>这是完整的小程序。保存为 <code>StoreDemo.java</code>，放在独立练习目录中。它不修改你的任务数据库。</p>
+<pre><code>interface TaskStore {
+    void save(String content);
+}
+
+class ConsoleStore implements TaskStore {
+    @Override
+    public void save(String content) {
+        System.out.println(&quot;终端收到：&quot; + content);
+    }
+}
+
+class UpperCaseStore implements TaskStore {
+    @Override
+    public void save(String content) {
+        System.out.println(&quot;转换后收到：&quot; + content.toUpperCase());
+    }
+}
+
+public class StoreDemo {
+    static void submit(TaskStore store, String content) {
+        store.save(content);
+    }
+
+    public static void main(String[] args) {
+        submit(new ConsoleStore(), &quot;learn Java&quot;);
+        submit(new UpperCaseStore(), &quot;learn Java&quot;);
+    }
+}</code></pre>
+<pre><code>javac -encoding UTF-8 StoreDemo.java
+java StoreDemo</code></pre>
+<p>运行后会依次看到“终端收到：learn Java”和“转换后收到：LEARN JAVA”。这两个类先用打印来演示不同做法。真实的 JSON 保存和 MySQL 保存也可以遵守同样的接口。</p>
+<p>从 main 开始读：new ConsoleStore() 创建一个对象；submit 接收它，参数类型写的是 TaskStore，所以任何实现 TaskStore 的对象都可以传进来。submit 调用 store.save 时，Java 根据实际传入的对象选择要执行的方法。第二次传入 UpperCaseStore，就执行它的实现。这个过程叫多态。</p>
+<p>接口也可以用作变量的类型，例如 TaskStore store = new ConsoleStore()。左边告诉编译器“我通过保存接口使用它”，右边决定实际创建什么对象。接口本身没有在这里提供保存实现，所以不能写 new TaskStore() 来创建对象。</p>
+<h3>为什么 save 前面还要写 public？</h3>
+<p>上面接口中声明的 save 方法是公开的。实现类中的方法也要允许外部调用，所以使用 public。@Override 则请编译器检查：这个方法确实实现或重写了已有的方法；名字或参数写错时，编译器会提醒你。</p>
+<h3>回到你的项目，应该放在哪里？</h3>
+<p>以后若要保留两种保存方式，可以把 TaskStore 接口放到 TaskStore.java，把 JSON 和 MySQL 的实现放到各自文件里。菜单持有 TaskStore，具体使用哪个实现，在创建对象时决定。当前项目只有一种保存方式时，可以先保留现有结构；理解接口后，再按实际需求调整。</p>
+</section>
+<section id="abstract"><h2>2. 抽象类：把共用的步骤放在一起</h2>
+<p>再想一个需求：每种保存方式都要先检查任务文字，空内容不允许保存。检查规则相同，真正写入的位置不同。抽象类可以把共同步骤写一次，再把不同的步骤留给子类。</p>
+<p>这是完整的小程序。保存为 <code>AbstractDemo.java</code>，放在独立练习目录中。它不修改你的任务数据库。</p>
+<pre><code>abstract class CheckedStore {
+    public final void save(String content) {
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException(&quot;任务内容不能为空&quot;);
+        }
+        write(content);
+    }
+
+    protected abstract void write(String content);
+}
+
+class ScreenStore extends CheckedStore {
+    @Override
+    protected void write(String content) {
+        System.out.println(&quot;保存：&quot; + content);
+    }
+}
+
+public class AbstractDemo {
+    public static void main(String[] args) {
+        CheckedStore store = new ScreenStore();
+        store.save(&quot;喝水&quot;);
+    }
+}</code></pre>
+<pre><code>javac -encoding UTF-8 AbstractDemo.java
+java AbstractDemo</code></pre>
+<p>结果是“保存：喝水”。实际执行顺序是 save 先检查文字，然后调用子类的 write。abstract class 声明抽象类；abstract 方法只有声明，子类负责实现；extends 表示继承。抽象类不能直接创建对象，这里创建的是 ScreenStore。</p>
+<p>final 写在 save 方法上，表示子类不能重写这个方法。因此子类可以提供 write 的做法，同时保留父类的检查步骤。</p>
+<h3>接口和抽象类怎么选？</h3>
+<p>想让不同的类遵守同一个调用约定，可以使用接口。几个相关类确实有共同的数据或处理步骤时，可以使用抽象类。Java 的类只能直接继承一个类，但可以实现多个接口。先看自己需要共享什么，再决定。</p>
+<h3>四种访问范围</h3>
+<table><tr><th>修饰符</th><th>哪些地方可以访问</th></tr><tr><td>public</td><td>允许其他类访问；跨模块还受模块配置约束。</td></tr><tr><td>private</td><td>供所属类的内部代码使用。</td></tr><tr><td>不写</td><td>同一个包内的代码可以访问。</td></tr><tr><td>protected</td><td>同包代码可以访问；跨包子类也可按继承规则访问。</td></tr></table>
+<p>上例的 write 使用 protected，让子类参与实现；外部调用使用公开的 save。包就是类的分类名称，由文件开头的 package 声明。跨包使用 protected 成员时，还要满足子类访问规则，不能把它当成任意对象都能访问的 public。</p>
+</section>
+<section id="generic"><h2>3. 泛型与集合：先决定要装什么</h2>
+<p>你已经写过 List<String>。尖括号告诉 Java 这个列表保存字符串。如果往里面放整数，编译器就会提醒你。这样，取出元素时也知道它是什么类型。</p>
+<pre><code>List&lt;String&gt; names = new ArrayList&lt;&gt;();
+names.add(&quot;学习 Java&quot;);
+String first = names.get(0);</code></pre>
+<p>这是方法内部的片段，需要导入 java.util.List 和 java.util.ArrayList。get(0) 读取第一个元素，列表下标从 0 开始。</p>
+<h3>自己定义一个可以装不同类型的盒子</h3>
+<p>这是完整的小程序。保存为 <code>BoxDemo.java</code>，放在独立练习目录中。它不修改你的任务数据库。</p>
+<pre><code>class Box&lt;T&gt; {
+    private T value;
+
+    public void put(T value) { this.value = value; }
+    public T get() { return value; }
+}
+
+public class BoxDemo {
+    public static void main(String[] args) {
+        Box&lt;String&gt; box = new Box&lt;&gt;();
+        box.put(&quot;学习 Java&quot;);
+        System.out.println(box.get());
+    }
+}</code></pre>
+<pre><code>javac -encoding UTF-8 BoxDemo.java
+java BoxDemo</code></pre>
+<p>输出“学习 Java”。T 是我们给类型留的位置。创建 Box<String> 时，T 对应 String，因此 put 接收字符串，get 返回字符串。换成 Box<Integer>，它就存放整数。泛型里需要使用 Integer 等引用类型，不能写 Box<int>。</p>
+<h3>List、Set、Map 怎么选？</h3>
+<table><tr><th>实际需求</th><th>常用选择</th><th>原因</th></tr><tr><td>按顺序显示任务</td><td>ArrayList</td><td>保存顺序，允许重复，支持按下标读取。</td></tr><tr><td>收集不重复的标签</td><td>HashSet</td><td>按相等性规则去重，不保证添加顺序。</td></tr><tr><td>按编号找到任务</td><td>HashMap</td><td>一个键对应一个值。</td></tr></table>
+<p>想保留标签或键的插入顺序，可以看 LinkedHashSet、LinkedHashMap；需要按键排序时，可以看 TreeMap。选择容器前，先问自己：是否允许重复、是否需要顺序、是否按键查找。</p>
+</section>
+<section id="hash"><h2>4. HashMap：怎样找到同一个键？</h2>
+<p>假设把任务编号作为键，任务内容作为值。put(3, "喝水") 放入一条对应关系；get(3) 可以取出“喝水”。再次 put(3, "休息") 会替换这个键原来的值。</p>
+<p>HashMap 会利用键的 hashCode 计算可能存放的位置，再通过 equals 判断是不是同一个键。可以把它想成先找到一格抽屉，再在抽屉里核对标签。不同键可能进入同一格，这叫哈希冲突。哈希值相同，并不能说明两个键相等。</p>
+<h3>为什么自定义键要写 equals 和 hashCode？</h3>
+<p>这是完整的小程序。保存为 <code>KeyDemo.java</code>，放在独立练习目录中。它不修改你的任务数据库。</p>
+<pre><code>import java.util.HashMap;
+import java.util.Map;
+
+class TaskKey {
+    private final int id;
+    TaskKey(int id) { this.id = id; }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) return true;
+        if (!(other instanceof TaskKey)) return false;
+        TaskKey key = (TaskKey) other;
+        return this.id == key.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(id);
+    }
+}
+
+public class KeyDemo {
+    public static void main(String[] args) {
+        Map&lt;TaskKey, String&gt; tasks = new HashMap&lt;&gt;();
+        tasks.put(new TaskKey(3), &quot;喝水&quot;);
+        System.out.println(tasks.get(new TaskKey(3)));
+    }
+}</code></pre>
+<pre><code>javac -encoding UTF-8 KeyDemo.java
+java KeyDemo</code></pre>
+<p>输出“喝水”。两次 new 创建了两个不同对象，但这里约定编号相同就算相同的键。equals 比较 id，hashCode 也由 id 生成。相等对象必须有相同哈希值。键放入 Map 后，参与比较的内容应保持稳定，所以这里把 id 声明为 final。</p>
+<p>HashMap 会在冲突位置进一步组织和查找条目。常见 JDK 实现会使用链表，并在满足条件时转换成树结构；数据变多时还会扩容。先理解“定位位置，再判断相等”，之后读源码会更容易。</p>
+<h3>遍历时删除，为什么用迭代器？</h3>
+<p>你已经遇到过 ConcurrentModificationException。for-each 背后的迭代器在遍历时，发现列表通过其他入口发生了结构修改，就可能报这个异常。使用 iterator.remove()，由迭代器自己删除刚读取的元素。单线程也会遇到这个问题。</p>
+</section>
+<section id="exception"><h2>5. 异常：失败会交到谁手里？</h2>
+<p>读取数据库可能失败：密码不对、容器没启动、表不存在。程序需要告诉调用者发生了什么。异常就是沿着调用路径传递失败信息的一种方式。</p>
+<pre><code>Todo 调用 TaskDao
+TaskDao 调用 Dbutil
+Dbutil 连接失败，抛出 SQLException
+TaskDao 的 catch 接住它</code></pre>
+<p>throw 表示实际抛出一个异常；throws 写在方法声明上，说明某种异常可能继续交给调用者。try 包住可能失败的操作，catch 处理匹配到的异常。</p>
+<p>这是完整的小程序。保存为 <code>ErrorDemo.java</code>，放在独立练习目录中。它不修改你的任务数据库。</p>
+<pre><code>public class ErrorDemo {
+    static int readNumber(String input) {
+        return Integer.parseInt(input);
+    }
+
+    public static void main(String[] args) {
+        try {
+            int number = readNumber(&quot;你好&quot;);
+            System.out.println(number);
+        } catch (NumberFormatException e) {
+            System.out.println(&quot;请输入数字。&quot;);
+        }
+    }
+}</code></pre>
+<pre><code>javac -encoding UTF-8 ErrorDemo.java
+java ErrorDemo</code></pre>
+<p>输出“请输入数字。”readNumber 转换失败，无法返回整数，异常传到 main，被 catch 接住。把“你好”改成“3”，转换成功，输出就是 3。</p>
+<h3>异常之间的关系</h3>
+<pre><code>Throwable
+├── Error
+└── Exception
+    ├── IOException、SQLException 等受检异常
+    └── RuntimeException
+        ├── NumberFormatException
+        └── NullPointerException</code></pre>
+<p>SQLException、IOException 这类受检异常，通常要求代码捕获处理，或通过 throws 声明继续传递。RuntimeException 及其子类不强制这样声明，但运行时仍可能发生。Error 通常表示运行环境或系统层面的严重问题。</p>
+<p>catch 后只打印报错，程序会继续执行后面的代码。你的查询方法如果捕获异常后返回空列表，菜单就难以区分“没有任务”和“查询失败”。以后可以把 SQLException 交给菜单，在菜单中明确显示“查询失败，请检查连接”。</p>
+<p>文件和数据库连接用完要关闭。try 后面的圆括号可以声明需要自动关闭的资源，离开代码块时会自动关闭它们。finally 常用于其他收尾动作；使用自动关闭资源的写法后，通常无需再手动关闭同一个资源。</p>
+</section>
+<section id="stream"><h2>6. Lambda、Stream、Optional：把处理步骤写清楚</h2>
+<p>假设有三条任务，你想找出包含“学习”的任务，再把每一条前面加上“待办：”。先想清楚过程：筛选，再转换，最后收集。</p>
+<p>这是完整的小程序。保存为 <code>PipelineDemo.java</code>，放在独立练习目录中。它不修改你的任务数据库。</p>
+<pre><code>import java.util.List;
+import java.util.Optional;
+
+public class PipelineDemo {
+    public static void main(String[] args) {
+        List&lt;String&gt; tasks = List.of(&quot;学习 Java&quot;, &quot;喝水&quot;, &quot;学习 Git&quot;);
+        List&lt;String&gt; result = tasks.stream()
+                .filter(t -&gt; t.contains(&quot;学习&quot;))
+                .map(t -&gt; &quot;待办：&quot; + t)
+                .toList();
+        System.out.println(result);
+
+        Optional&lt;String&gt; found = tasks.stream()
+                .filter(t -&gt; t.contains(&quot;Docker&quot;))
+                .findFirst();
+        System.out.println(found.orElse(&quot;没有找到&quot;));
+    }
+}</code></pre>
+<pre><code>javac -encoding UTF-8 PipelineDemo.java
+java PipelineDemo</code></pre>
+<p>第一行输出两条加了“待办：”的学习任务，第二行输出“没有找到”。filter 保留符合条件的项；map 把每一项转换成新值；toList 把结果收集成列表。原 tasks 保持原样。</p>
+<h3>箭头为什么可以交给 filter？</h3>
+<p>filter 需要一个“接收一项、返回是否保留”的判断。t -> t.contains("学习") 正好表达这个动作：接收 t，返回 true 或 false。Java 用函数式接口描述这种动作；这类接口只有一个抽象方法，Lambda 可以提供该方法的实现。map 则需要一个“接收一项、返回转换结果”的动作。</p>
+<p>Stream 的中间处理通常等到终止操作才开始执行。这里 toList 和 findFirst 是终止操作。一次 Stream 使用完后，需要重新从集合创建 Stream，才能进行另一轮处理。</p>
+<h3>为什么查找结果是 Optional？</h3>
+<p>findFirst 可能找不到任何项，所以返回 Optional。orElse 提供没找到时使用的值。也可以用 ifPresent(value -> ...) 只在有值时执行动作，或用 orElseThrow 抛出异常。直接 get 而没有确认存在，可能在空结果上抛出异常。</p>
+</section>
+<section id="io"><h2>7. 文件里的字节，怎样变成中文？</h2>
+<p>电脑文件保存的是字节。文字需要按编码规则转换成字节，读取时再按同一种规则还原。UTF-8 就是一种常用编码。写入和读取使用不同编码，中文就可能变成乱码。</p>
+<h3>字节流与字符流各做什么？</h3>
+<p>处理图片和压缩包时，需要保留原始字节，可以使用 InputStream、OutputStream 等字节流。处理文本时，可以使用 Reader、Writer 等字符流。InputStreamReader 把读到的字节按指定编码变成字符；OutputStreamWriter 做相反的转换。</p>
+<p>BufferedReader 在读取器外面增加缓冲，提供逐行读取等操作。缓冲可以减少频繁访问底层数据源的次数。小文本也可以直接用 Files.readString，选择取决于数据量和处理方式。</p>
+<p>这是完整的小程序。保存为 <code>TextDemo.java</code>，放在独立练习目录中。它不修改你的任务数据库。</p>
+<pre><code>import java.io.BufferedReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public class TextDemo {
+    public static void main(String[] args) throws Exception {
+        Path file = Files.createTempFile(&quot;java-text-demo-&quot;, &quot;.txt&quot;);
+        try {
+            Files.writeString(file, &quot;学习 Java\n喝水\n&quot;, StandardCharsets.UTF_8);
+            try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    System.out.println(line);
+                }
+            }
+            byte[] bytes = Files.readAllBytes(file);
+            System.out.println(&quot;文件字节数：&quot; + bytes.length);
+        } finally {
+            Files.deleteIfExists(file);
+        }
+    }
+}</code></pre>
+<pre><code>javac -encoding UTF-8 TextDemo.java
+java TextDemo</code></pre>
+<p>这段程序创建一个临时文件，写入两行中文，再逐行读出，最后删除临时文件。readLine 到文件末尾时返回 null，所以循环结束。readAllBytes 读到的是字节数组，最后打印的是字节数量。</p>
+<h3>JSON 保存为什么叫序列化？</h3>
+<p>Task 对象在内存中有自己的表示。Gson 把它转换成 JSON 文字，便于保存和传输，这叫序列化；fromJson 把文字变回对象，这叫反序列化。接下来 Writer 再把 JSON 文字按编码写成文件字节。转换数据格式和写文件，是这条流程中的两个步骤。</p>
+</section>
+<section id="reflection"><h2>8. 反射与注解：让程序读取代码的标记</h2>
+<p>假设你写了很多类，想让一个工具自动找到“需要显示说明”的类。可以给这些类加一个标记，再让工具在运行时读取标记。标记用注解表示，运行时查看类的信息会用到反射。</p>
+<p>这是完整的小程序。保存为 <code>AnnotationDemo.java</code>，放在独立练习目录中。它不修改你的任务数据库。</p>
+<pre><code>import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.lang.annotation.ElementType;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@interface Description {
+    String value();
+}
+
+@Description(&quot;负责保存任务&quot;)
+class DemoStore {
+}
+
+public class AnnotationDemo {
+    public static void main(String[] args) {
+        Class&lt;DemoStore&gt; type = DemoStore.class;
+        Description info = type.getAnnotation(Description.class);
+        if (info != null) {
+            System.out.println(info.value());
+        }
+    }
+}</code></pre>
+<pre><code>javac -encoding UTF-8 AnnotationDemo.java
+java AnnotationDemo</code></pre>
+<p>结果是“负责保存任务”。@interface 定义注解；value 是这个标记携带的文字。@Description(...) 把标记加到 DemoStore 类上。RetentionPolicy.RUNTIME 让它保留到运行时，ElementType.TYPE 限定它可以标在类等类型声明上。</p>
+<p>DemoStore.class 取得描述这个类的 Class 对象；getAnnotation 读取指定注解；info.value() 取出文字。把 @Description 那一行删掉再运行，info 就是 null，程序不会打印说明。</p>
+<h3>框架为什么需要它们？</h3>
+<p>框架作者无法提前知道你以后会写哪些业务类。框架可以约定一些注解，再在运行时识别这些类，读取配置，并据此创建对象或调用方法。上例中的“读取标记，再执行动作”就是这类工作的一个小部分。</p>
+<p>注解需要有工具负责处理。@Override 由编译器检查；上面自定义的 Description 则由 main 中的代码读取。反射还能查找字段、构造方法和普通方法，之前教程中的 getMethod 与 invoke 就演示了查找和调用。</p>
+</section>
+<section><h2>接下来怎么读？</h2><p>先读接口和抽象类两节，对照自己的 JSON 保存与数据库保存想一想：两种实现可以共享哪些调用约定？然后再按项目中遇到的问题，阅读后面的章节。示例用于理解现象，不要求把所有写法背下来。</p></section><footer><a href="code-guide.html">← 返回任务清单代码讲解</a></footer></article></main></div></body></html>
