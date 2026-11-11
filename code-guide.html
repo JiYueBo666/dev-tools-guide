@@ -1,0 +1,94 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>读懂自己的任务清单 | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="cheatsheet.html">命令速查</a></header><div class="layout"><aside><div class="side-title">读懂自己的代码</div><a href="#map">项目结构</a><a href="#calls">变量、对象和方法</a><a href="#imports">包与依赖</a><a href="#insert">跟着添加任务走</a><a href="#query">结果怎么返回</a><a href="#resources">异常与资源关闭</a><a href="#input">输入与菜单</a><a href="#json">JSON 与数据库</a><a href="#read">自己读代码的方法</a><p>前面的教程</p><a href="java.html">Java 入门</a><a href="mysql.html">MySQL 实战</a></aside><main><article><section><div class="eyebrow">10 / 结合你的项目理解代码</div><h1>程序能跑了，接下来读懂它</h1><p class="lead">你已经做出了任务清单。现在，我们沿着一条任务走一遍，看看代码为什么要这样写。</p><p>这一章对应你项目中的 Todo、TaskDao 和 Dbutil。每段代码都会说明它放在哪里、接收什么、做什么。你可以同时打开自己的项目，对照阅读。</p><p>这一轮先读懂已有程序。下面的代码是从项目中取出的片段，除明确标出的完整示例外，不需要单独运行。</p></section>
+<section id="map"><h2>1. 先看三个文件各管什么</h2>
+<p>选择“添加任务”后，程序要接收文字、连接数据库、执行 SQL。把这些事情放到不同的类中，查问题时就容易找到对应的位置。</p><table><tr><th>文件</th><th>负责的事情</th></tr><tr><td>Todo.java</td><td>显示菜单，接收输入，调用相应功能。</td></tr><tr><td>TaskDao.java</td><td>组织任务相关的 SQL，执行添加、查询、修改和删除。</td></tr><tr><td>Dbutil.java</td><td>保存连接配置，提供连接数据库的方法。</td></tr></table><p>DAO 是一种常见命名，意思是负责数据访问的对象。在你的项目里，TaskDao 就是“替任务清单读写数据库的类”。这个名字来自开发习惯，Java 不要求类必须叫它。</p><div class="flow">Todo 接收输入 → TaskDao 执行操作 → Dbutil 提供连接 → MySQL 保存数据</div><p>TaskDao 执行 SQL 时会调用 Dbutil 获取连接。上图表示合作关系，真正的执行顺序在后面逐行展开。</p>
+</section>
+<section id="calls"><h2>2. 变量、对象和方法，怎么连起来？</h2>
+<pre><code>TaskDao dao = new TaskDao();
+dao.insert(content, date);</code></pre>
+<p>第一行创建一个 TaskDao 对象，并用变量 dao 保存它的引用。你可以把引用理解成找到这个对象的方式。第二行通过 dao，调用这个对象的 insert 方法，把 content 和 date 交给它。</p><table><tr><th>写法</th><th>含义</th></tr><tr><td>TaskDao</td><td>变量所使用的类型。</td></tr><tr><td>dao</td><td>你给变量起的名字，可以换名，但后面的使用要一致。</td></tr><tr><td>new TaskDao()</td><td>创建对象。这里会调用 TaskDao 的无参数构造方法。</td></tr><tr><td>dao.insert(...)</td><td>在这个对象上执行 insert 方法。</td></tr></table><p>你的 TaskDao 没有写构造方法，Java 会提供默认的无参数构造方法。再看被调用的方法：</p>
+<pre><code>public void insert(String content, String taskDate) {
+    // 添加任务的代码放在这里
+}</code></pre>
+<p>public 允许其他类调用它。void 表示执行完不返回一个值。insert 是方法名。括号里声明两个字符串参数，方法通过它们接收调用者交过来的文字。</p><p>调用 <code>dao.insert(content, date)</code> 时，第一个值交给方法里的 content，第二个值交给 taskDate。参数按位置对应，调用前后的变量名不必相同。</p><p>再看 Dbutil.getConnection()：它通过类名直接调用，因为 getConnection 声明成了 static。static 方法属于类，可以直接调用；insert 没有 static，我们通过创建的 dao 对象调用它。</p>
+</section>
+<section id="imports"><h2>3. import 和 Maven，各做什么？</h2>
+<p>假设你想读终端输入，需要使用 Java 提供的 Scanner。它的完整名称是 java.util.Scanner。文件开头写：</p>
+<pre><code>import java.util.Scanner;</code></pre>
+<p>写完后，下面可以直接用 Scanner 这个短名称。import 让编译器知道你说的是哪个类。它本身不下载文件，也不创建对象。</p>
+<pre><code>Scanner sc = new Scanner(System.in);</code></pre>
+<p>这一行才创建读取输入的对象。System.in 表示标准输入，在当前程序中就是终端输入。</p><table><tr><th>工具</th><th>来源</th><th>用途</th></tr><tr><td>Scanner、List、ArrayList</td><td>Java 自带，位于 java.util 包。</td><td>读取输入，保存列表。</td></tr><tr><td>Connection、PreparedStatement、ResultSet</td><td>Java 自带，位于 java.sql 包。</td><td>描述连接、SQL 操作和查询结果。</td></tr><tr><td>Gson</td><td>外部库，由 Maven 下载。</td><td>转换 Java 数据与 JSON。</td></tr><tr><td>MySQL Connector/J</td><td>外部库，由 Maven 下载。</td><td>实际完成 JDBC 与 MySQL 之间的通信。</td></tr></table><p>java.sql 提供了数据库操作的接口；MySQL 驱动提供与 MySQL 通信的具体实现。所以，代码能识别 Connection，并不代表已经有了 MySQL 驱动。</p><h3>pom.xml 为什么需要依赖信息？</h3>
+<pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;com.mysql&lt;/groupId&gt;
+    &lt;artifactId&gt;mysql-connector-j&lt;/artifactId&gt;
+    &lt;version&gt;9.5.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+<p>这段放在项目根目录 pom.xml 的 dependencies 中。它指定“哪一组提供者、哪个库、哪个版本”。Maven 按这个信息下载库，并把库加入项目的编译和运行环境。</p><p>新依赖的坐标通常从库的官方文档查找。包名可以查类的文档，或让编辑器根据类名补充 import。你需要理解它的用途，无须背下所有包名。</p><p>你的 <code>import java.sql.*;</code> 表示允许使用 java.sql 包中的类型短名称。它不包含子包，也不等于安装 MySQL。TaskDao 与 Dbutil 当前没有 package 声明，位于同一个默认包中，因此它们之间可以直接按类名引用。</p><h3>程序怎么运行时带上依赖？</h3><p>先在含 pom.xml 的项目目录执行 <code>mvn compile</code>。运行 Todo 可以点击 VS Code 中 main 上方的 Run，或在同一目录执行：</p>
+<pre><code>mvn compile exec:java -Dexec.mainClass=Todo</code></pre>
+<p>Maven 会为运行准备项目所需的依赖。后面切换电脑时，依赖清单仍保存在 pom.xml 中，Maven 可以重新下载。</p>
+</section>
+<section id="insert"><h2>4. 跟着“添加任务”走一遍</h2>
+<p>先看 Todo 中接收内容的部分：</p>
+<pre><code>String content = sc.nextLine();
+dao.insert(content, date);</code></pre>
+<p>假设用户输入“学习集合”，日期字符串是“11月11日星期三”。调用 insert 后，方法中的 content 和 taskDate 就分别拿到这两个值。</p><p>接着进入 TaskDao：</p>
+<pre><code>String sql = &quot;insert into tasks (content, task_date) values (?, ?)&quot;;
+try (Connection conn = Dbutil.getConnection();
+     PreparedStatement ps = conn.prepareStatement(sql)) {
+    ps.setString(1, content);
+    ps.setString(2, taskDate);
+    ps.executeUpdate();
+} catch (SQLException e) {
+    e.printStackTrace();
+}</code></pre>
+<p>第一行创建一段 SQL 文字，它还没有发送出去。两个问号留出要填写的位置。接下来，Dbutil.getConnection() 使用连接地址、用户名和密码连接 MySQL，并返回 Connection。</p><p><code>conn.prepareStatement(sql)</code> 通过这条连接准备 SQL 操作。随后，setString(1, content) 填第一个位置，setString(2, taskDate) 填第二个位置。这里的编号从 1 开始。</p><p>最后，executeUpdate() 才执行添加操作。PreparedStatement 把输入作为参数值处理，因此任务中出现引号时也不需要自己拼接 SQL。</p><p>executeUpdate() 返回受影响的行数。你当前没有接收这个值。以后想提示“添加成功”，可以用一个 int 变量接收，再根据结果输出。</p><h3>Dbutil 在哪里参与？</h3>
+<pre><code>public static Connection getConnection() throws SQLException {
+    return DriverManager.getConnection(URL, USER, PASSWORD);
+}</code></pre>
+<p>这个方法向驱动管理器请求连接，再通过 return 把连接交给调用它的 TaskDao。返回类型 Connection 告诉我们它会交回什么。throws SQLException 表示连接失败时，异常可以交给调用它的代码处理；上面的 catch 就负责接住这个异常。</p><p>如果看到 <code>Class.forName("com.mysql.cj.jdbc.Driver")</code>，那是在按完整类名请求加载驱动。现代 JDBC 驱动通常可以自动发现；你当前显式加载时，必须把类名写准确，否则连接代码还没执行就会失败。</p>
+</section>
+<section id="query"><h2>5. 数据库里的结果，怎么回到菜单？</h2>
+<pre><code>List&lt;String&gt; tasks = dao.findALl();
+for (String t : tasks) {
+    print(t);
+}</code></pre>
+<p>这段位于 Todo。findALl() 返回一个字符串列表，Todo 用 tasks 接收，然后逐行打印。你的方法名中 ALl 的大小写就是当前代码的写法，调用时必须保持一致。</p><p>再进入 TaskDao.findALl：</p>
+<pre><code>List&lt;String&gt; result = new ArrayList&lt;&gt;();
+String sql = &quot;select id, content, task_date from tasks order by id&quot;;
+try (Connection conn = Dbutil.getConnection();
+     PreparedStatement ps = conn.prepareStatement(sql);
+     ResultSet rs = ps.executeQuery()) {
+    while (rs.next()) {
+        result.add(rs.getInt(&quot;id&quot;) + &quot; | &quot;
+                + rs.getString(&quot;content&quot;) + &quot; | &quot;
+                + rs.getString(&quot;task_date&quot;));
+    }
+} catch (SQLException e) {
+    e.printStackTrace();
+}
+return result;</code></pre>
+<p>List&lt;String&gt; 表示列表里装字符串，ArrayList 是这里使用的具体列表实现。new ArrayList&lt;&gt;() 创建一个空列表；右边的尖括号让编译器根据左边推断元素类型。</p><p>executeQuery() 执行查询，返回 ResultSet。可以把它理解成一批还需要逐行读取的结果。rs.next() 移到下一行：有下一行时返回 true，循环继续；没有下一行时返回 false，循环结束。</p><p>每轮循环按列名取值，把编号、内容和日期拼成一行，再用 result.add(...) 放进列表。return result 把这个列表交回 Todo。到了这里，一次查询才走完：</p><div class="flow">MySQL 的行 → ResultSet 逐行读取 → List&lt;String&gt; → Todo 打印</div><h3>“看今天任务”多做了什么？</h3><p>findTodayTask(date) 在 SELECT 中增加 <code>WHERE task_date = ?</code>，然后通过 <code>ps.setString(1, date)</code> 填入日期。数据库只返回日期文字完全相同的行。当前日期是展示用的文字，若要按先后排序或跨年查询，后续应改成统一的完整日期并使用 DATE 列。</p><h3>修改和删除也是相同的过程</h3><p>updateTask 先准备 UPDATE，再填入新内容和编号；deleteById 准备 DELETE，再填入编号。它们用 executeUpdate() 执行。WHERE 决定处理哪一行，省略它会影响整张表。</p>
+</section>
+<section id="resources"><h2>6. try、catch 和括号，为什么这样放？</h2>
+<p>数据库连接使用完后需要关闭。否则程序长期运行时，会占着越来越多的连接。Java 的 try-with-resources 可以在代码离开这一段时自动关闭资源：</p>
+<pre><code>try (Connection conn = Dbutil.getConnection();
+     PreparedStatement ps = conn.prepareStatement(sql)) {
+    // 使用 conn 和 ps
+} catch (SQLException e) {
+    e.printStackTrace();
+}</code></pre>
+<p>try 后面的圆括号声明需要自动关闭的资源，用分号隔开。花括号里面放操作。执行结束或发生异常时，Java 会关闭已经成功创建的资源，关闭顺序与创建顺序相反。</p><p>catch 接住 SQLException，e 保存异常信息。printStackTrace() 输出调用路径，方便定位出错的位置。它不会自动重试，也不会把失败变成成功。</p><p>你的查询方法在失败时打印异常，然后仍返回 result。如果此时 result 为空，菜单就可能只显示一个空列表。以后需要向用户区分“没有任务”和“查询失败”，可以让异常继续向上传递，或设计明确的结果返回方式。</p>
+</section>
+<section id="input"><h2>7. 菜单怎么重复，输入为什么要处理换行？</h2>
+<p>while (true) 让菜单重复执行。switch 根据选项选择分支，case 2 -&gt; 对应添加任务。退出分支的 return 结束 main，程序随之结束。</p>
+<pre><code>int choice = sc.nextInt();
+sc.nextLine();
+String content = sc.nextLine();</code></pre>
+<p>这三行演示连续读取的过程。用户输入数字并按回车后，nextInt() 取走数字，换行还留在输入里。第一条 nextLine() 读掉当前行剩余的内容；第二条 nextLine() 才等待任务文字。在你的代码中，第二条位于添加任务分支。</p><p>如果输入字母，nextInt() 会抛出 InputMismatchException。后面改进输入时，可以改成先读取整行文字，再尝试用 Integer.parseInt 转成数字，并在转换失败时提示重新输入。</p><p>你已经给清屏写了 clearScreen()。调用位置决定何时清屏：放在 main 开头，只清一次；放在循环开头，每轮都清。若每轮清屏，要在显示结果后等待用户按回车，否则刚打印的任务会马上消失。</p>
+</section>
+<section id="json"><h2>8. 从 JSON 到 MySQL，什么发生了变化？</h2>
+<table><tr><th>JSON 版本</th><th>MySQL 版本</th></tr><tr><td>Gson 把文件转成任务列表。</td><td>SELECT 查询任务，ResultSet 接收结果。</td></tr><tr><td>在列表中加入任务，再写回整个文件。</td><td>INSERT 添加一行。</td></tr><tr><td>遍历列表查找并删除。</td><td>DELETE 按编号删除。</td></tr><tr><td>代码自己计算新编号。</td><td>AUTO_INCREMENT 生成编号。</td></tr></table><p>两种版本都在完成相同的需求：接收任务、保存任务、取出任务。保存的位置和操作方式发生了变化，菜单仍然可以保持原来的使用方式。</p><p>你在这一过程中实际用到了类和方法、字符串、集合、循环、异常、外部依赖与数据库。它们现在都能对应到项目中的一段代码。</p>
+</section>
+<section id="read"><h2>9. 下次遇到看不懂的代码，怎么读？</h2>
+<p>先找到你想理解的功能入口，例如添加任务的 case 2。读到方法调用时，跳到方法定义，确认参数是什么、结果是什么。遇到新类，先判断来源，再查它的方法用途。</p><ol><li>圈出输入。例如任务内容和日期。</li><li>找到处理这些输入的方法，例如 insert。</li><li>找出真正产生效果的语句，例如 executeUpdate。</li><li>查看返回值和异常会交给谁。</li></ol><p>你可以先用自己的话说明一次添加任务：Todo 得到文字，TaskDao 准备 SQL，Dbutil 提供连接，驱动把命令交给 MySQL。能解释这一条路径后，再读查询路径。</p><p>接下来先消化这一章。已有项目不需要重做。遇到某一行读不懂，带着文件名和那一行继续讨论。</p>
+</section>
+<footer><a href="mysql.html">← 返回 MySQL 实战</a> · <a href="java.html">回顾 Java 基础</a></footer></article></main></div></body></html>
