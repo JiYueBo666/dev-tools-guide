@@ -1,5 +1,48 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>改完代码，怎样知道旧功能还好？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">13 / SPRING BOOT</div><h1>改完代码，怎样知道旧功能还好？</h1><p class="lead">你不想每次改一个方法，就从添加任务到删除任务手动点一遍。</p><p>手动试一次很直观，但功能变多后容易漏。自动测试把“发什么请求、应该收到什么”写下来，每次改完让电脑重复检查。它保留的是你对行为的约定。</p><p>先从一条最重要的路径开始：添加任务，按返回地址查到它，标记完成，再删除。下载示例已经把这条路径放在 src/test/java/com/example/todo/TaskHttpTest.java 中。</p><h2>请求可以在测试里发给框架</h2><p>MockMvc 会把模拟请求交给 Spring MVC 的处理链，让路由、JSON 转换、校验、异常处理等一起参与，但不需要为测试监听真实端口。它对应图片里 httptest 的一类使用目的。</p><pre><code>mvc.perform(post(&quot;/api/tasks&quot;)
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>改完代码，怎样知道旧功能还好？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">13 / SPRING BOOT</div><h1>改完代码，怎样知道旧功能还好？</h1><p class="lead">你不想每次改一个方法，就从添加任务到删除任务手动点一遍。</p><p>手动试一次很直观，但功能变多后容易漏。自动测试把“发什么请求、应该收到什么”写下来，每次改完让电脑重复检查。它保留的是你对行为的约定。</p><p>先从一条最重要的路径开始：添加任务，按返回地址查到它，标记完成，再删除。我们接下来会把这条路径写进 src/test/java/com/example/todo/TaskHttpTest.java。</p><h2>请求可以在测试里发给框架</h2><p>MockMvc 会把模拟请求交给 Spring MVC 的处理链，让路由、JSON 转换、校验、异常处理等一起参与，但不需要为测试监听真实端口。它对应图片里 httptest 的一类使用目的。</p><pre><code>mvc.perform(post(&quot;/api/tasks&quot;)
         .contentType(MediaType.APPLICATION_JSON)
         .content(&quot;{&quot;content&quot;:&quot;学习框架&quot;}&quot;))
     .andExpect(status().isCreated())
-    .andExpect(jsonPath(&quot;$.content&quot;).value(&quot;学习框架&quot;));</code></pre><p>这是 TaskHttpTest 方法内部的一段。perform 发模拟请求，andExpect 写预期：状态是 201，响应 content 是刚才发的文字。如果有人以后把成功码改错或丢掉内容，这个检查会失败。</p><p>Spring Boot 4 的 Web MVC 测试使用 spring-boot-starter-webmvc-test。示例中的 @AutoConfigureMockMvc 来自 org.springframework.boot.webmvc.test.autoconfigure，不要把其他大版本教程的包名直接混进来。下载包已经配好相关 import 与依赖。</p><h2>同一条规则，用几种输入检查</h2><p>空字符串、纯空格、缺少字段和损坏 JSON 都应该被拒绝。可以把这些输入放到参数表里，让同一个测试逐项执行。这是表格驱动测试的思路，JUnit 可以用 @ParameterizedTest 与 @ValueSource 表达。</p><p>这些输入不只是为了增加测试数量。它们分别检查读取正文与校验规则的边界。有效内容应该成功，格式或内容不合适应该返回 400，找不到任务应该返回 404。围绕行为和失败情况选测试，比重复断言每个私有方法更有用。</p><p>在含 pom.xml 的目录运行 mvn test。全部通过，Maven 最后显示 BUILD SUCCESS。测试本身不启动你的 MySQL，也不连接原项目的数据。</p><h2>内存测试通过，数据库就一定没问题吗？</h2><p>还不能据此确认 SQL、表结构和事务。它们需要另外的数据库集成测试。可以用 Testcontainers 启动一次性 MySQL 容器，让测试建表、写入、检查，结束后丢弃；也可以明确使用专用测试库，并对初始化和清理作出安排。</p><p>测试账号不应有权限写入你的日常任务库。测试前核对实际数据源配置，比约定大家“别写错库名”更可靠。使用 H2 跑得过，也不代表 MySQL 的方言、约束与锁行为完全相同。</p><h2>为什么加了回滚，数据库还是留下了数据？</h2><p>测试方法上的事务一般绑定当前线程。真实 HTTP 测试如果启动随机端口，客户端和服务端在不同线程处理，它们可能使用不同事务。测试线程结束回滚，不会自动撤销服务器已经提交的写入。</p><p>所以要按测试方式设计隔离：同线程的数据库测试可以使用测试事务回滚；真实服务请求则使用独立测试库、每例清理、唯一数据或一次性容器。异步任务和 REQUIRES_NEW 事务也要单独考虑。</p><h2>到这里，项目具备了什么？</h2><p>接口有约定，输入有检查，错误有一致回复，日志能找到同一条请求，保存层可以替换，关键行为有自动检查。接下来把原有 TaskDao 接入时，你可以先替换保存层，再用这些行为检查确认接口仍然履行原来的约定。</p><p>参考：<a href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">Spring Boot 测试</a>、<a href="https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/tx.html">测试事务与回滚</a>。</p><footer><a href="framework-orm.html">← 上一篇</a> · </footer></article></main></div></body></html>
+    .andExpect(jsonPath(&quot;$.content&quot;).value(&quot;学习框架&quot;));</code></pre><p>这是 TaskHttpTest 方法内部的一段。perform 发模拟请求，andExpect 写预期：状态是 201，响应 content 是刚才发的文字。如果有人以后把成功码改错或丢掉内容，这个检查会失败。</p><p>Spring Boot 4 的 Web MVC 测试使用 spring-boot-starter-webmvc-test。示例中的 @AutoConfigureMockMvc 来自 org.springframework.boot.webmvc.test.autoconfigure，不要把其他大版本教程的包名直接混进来。下面会给出所需依赖和完整测试文件。</p><h2>同一条规则，用几种输入检查</h2><p>空字符串、纯空格、缺少字段和损坏 JSON 都应该被拒绝。可以把这些输入放到参数表里，让同一个测试逐项执行。这是表格驱动测试的思路，JUnit 可以用 @ParameterizedTest 与 @ValueSource 表达。</p><p>这些输入不只是为了增加测试数量。它们分别检查读取正文与校验规则的边界。有效内容应该成功，格式或内容不合适应该返回 400，找不到任务应该返回 404。围绕行为和失败情况选测试，比重复断言每个私有方法更有用。</p><p>在含 pom.xml 的目录运行 mvn test。全部通过，Maven 最后显示 BUILD SUCCESS。测试本身不启动你的 MySQL，也不连接原项目的数据。</p><h2>内存测试通过，数据库就一定没问题吗？</h2><p>还不能据此确认 SQL、表结构和事务。它们需要另外的数据库集成测试。可以用 Testcontainers 启动一次性 MySQL 容器，让测试建表、写入、检查，结束后丢弃；也可以明确使用专用测试库，并对初始化和清理作出安排。</p><p>测试账号不应有权限写入你的日常任务库。测试前核对实际数据源配置，比约定大家“别写错库名”更可靠。使用 H2 跑得过，也不代表 MySQL 的方言、约束与锁行为完全相同。</p><h2>为什么加了回滚，数据库还是留下了数据？</h2><p>测试方法上的事务一般绑定当前线程。真实 HTTP 测试如果启动随机端口，客户端和服务端在不同线程处理，它们可能使用不同事务。测试线程结束回滚，不会自动撤销服务器已经提交的写入。</p><p>所以要按测试方式设计隔离：同线程的数据库测试可以使用测试事务回滚；真实服务请求则使用独立测试库、每例清理、唯一数据或一次性容器。异步任务和 REQUIRES_NEW 事务也要单独考虑。</p><h2>到这里，项目具备了什么？</h2><p>接口有约定，输入有检查，错误有一致回复，日志能找到同一条请求，保存层可以替换，关键行为有自动检查。接下来把原有 TaskDao 接入时，你可以先替换保存层，再用这些行为检查确认接口仍然履行原来的约定。</p><p>参考：<a href="https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html">Spring Boot 测试</a>、<a href="https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/tx.html">测试事务与回滚</a>。</p><h2>现在把检查写成文件</h2><p>先在 pom.xml 的 dependencies 中增加测试依赖，scope 为 test，表示它只参与测试：</p><pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-webmvc-test&lt;/artifactId&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre><p>创建 src/test/java/com/example/todo/TaskHttpTest.java。下面是完整文件：</p><pre><code>package com.example.todo;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+@SpringBootTest
+@AutoConfigureMockMvc
+class TaskHttpTest {
+    @Autowired MockMvc mvc;
+    @Test void createsAndReadsTask() throws Exception {
+        String location = mvc.perform(post(&quot;/api/tasks&quot;).contentType(MediaType.APPLICATION_JSON)
+                .content(&quot;{\&quot;content\&quot;:\&quot;学习框架\&quot;}&quot;))
+                .andExpect(status().isCreated()).andExpect(jsonPath(&quot;$.content&quot;).value(&quot;学习框架&quot;))
+                .andExpect(header().exists(&quot;X-Request-ID&quot;)).andReturn().getResponse().getHeader(&quot;Location&quot;);
+        mvc.perform(get(location)).andExpect(status().isOk()).andExpect(jsonPath(&quot;$.done&quot;).value(false));
+        mvc.perform(patch(location + &quot;/done&quot;)).andExpect(status().isOk()).andExpect(jsonPath(&quot;$.done&quot;).value(true));
+        mvc.perform(delete(location)).andExpect(status().isNoContent());
+        mvc.perform(get(location)).andExpect(status().isNotFound()).andExpect(jsonPath(&quot;$.code&quot;).value(&quot;TASK_NOT_FOUND&quot;));
+    }
+    @ParameterizedTest @ValueSource(strings={&quot;{\&quot;content\&quot;:\&quot;\&quot;}&quot;,&quot;{\&quot;content\&quot;:\&quot;   \&quot;}&quot;,&quot;{}&quot;,&quot;{broken&quot;})
+    void rejectsBadInput(String body) throws Exception {
+        mvc.perform(post(&quot;/api/tasks&quot;).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath(&quot;$.requestId&quot;).isNotEmpty());
+    }
+    @Test void preservesHttpErrors() throws Exception {
+        mvc.perform(put(&quot;/api/tasks&quot;)).andExpect(status().isMethodNotAllowed());
+        mvc.perform(get(&quot;/missing&quot;)).andExpect(status().isNotFound());
+        mvc.perform(post(&quot;/api/tasks&quot;).contentType(MediaType.TEXT_PLAIN).content(&quot;hello&quot;))
+                .andExpect(status().isUnsupportedMediaType());
+    }
+    @Test void rejectsNonNumericId() throws Exception {
+        mvc.perform(get(&quot;/api/tasks/not-a-number&quot;)).andExpect(status().isBadRequest());
+    }
+}</code></pre><p>先读 createsAndReadsTask：创建后取 Location，用它查询、完成、删除，再确认已经查不到。参数化测试轮流传入几种坏输入。这样每条预期都能对应到你亲手写过的接口。运行 mvn test，确认这些预期是否仍成立。</p><footer><a href="framework-orm.html">← 上一篇</a> · </footer></article></main></div></body></html>

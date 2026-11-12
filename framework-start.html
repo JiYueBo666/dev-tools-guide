@@ -1,12 +1,119 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>网页敲门，谁来接待？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">13 / SPRING BOOT</div><h1>网页敲门，谁来接待？</h1><p class="lead">打开一个地址，程序里某个方法就开始执行。这个连接是怎样建立的？</p><p>你以前的 Todo 等着人输入菜单编号，再用 switch 选择功能。网页接口也需要选择功能，只是选择依据换成了请求方法与路径。例如 GET /api/tasks 查列表，POST /api/tasks 添加任务。</p><p>Spring MVC 启动时会读取你给类和方法写的标记，把这些组合记下来。请求来了，它从这张对应表里找到处理方法。这张“哪种请求交给谁”的对应关系，就是路由。</p><h2>先接一条最简单的查询</h2><p>打开示例中的 src/main/java/com/example/todo/TaskController.java。文件顶部的 package 表示它属于哪个包，import 引入要用的框架类。先看类上的两个标记：</p><pre><code>@RestController
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>网页敲门，谁来接待？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">13 / SPRING BOOT</div><h1>从空文件夹写出第一个接口</h1><p>我们先让浏览器显示一句“你好，任务清单”。先不连接数据库，也不创建任务。只把一条请求怎样进入 Java 讲清楚。</p><h2>先给这个练习留一个地方</h2><p>在终端创建新目录。原来的 javacode 项目保留，后面需要接数据库时再对照它。</p><pre><code>mkdir -p ~/code/todo-web/src/main/java/com/example/todo
+mkdir -p ~/code/todo-web/src/main/resources
+cd ~/code/todo-web</code></pre><p>src/main/java 是 Maven 查找 Java 源码的目录。后面的 com/example/todo 对应我们要写的包名 com.example.todo。src/main/resources 放应用读取的配置等资源。现在这些文件夹还是空的。</p><h2>告诉 Maven：这个程序需要接收 HTTP</h2><p>在 todo-web 根目录创建 pom.xml。你已经见过项目的 groupId、artifactId 和 version，这一次主要增加 parent、Web 依赖和运行插件。完整内容如下：</p><pre><code>&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot;
+         xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+         xsi:schemaLocation=&quot;http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd&quot;&gt;
+    &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+    &lt;parent&gt;
+        &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+        &lt;artifactId&gt;spring-boot-starter-parent&lt;/artifactId&gt;
+        &lt;version&gt;4.1.2&lt;/version&gt;
+        &lt;relativePath/&gt;
+    &lt;/parent&gt;
+    &lt;groupId&gt;com.example&lt;/groupId&gt;
+    &lt;artifactId&gt;todo-web&lt;/artifactId&gt;
+    &lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;
+    &lt;properties&gt;
+        &lt;java.version&gt;21&lt;/java.version&gt;
+    &lt;/properties&gt;
+    &lt;dependencies&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-webmvc&lt;/artifactId&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+    &lt;build&gt;
+        &lt;plugins&gt;
+            &lt;plugin&gt;
+                &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+                &lt;artifactId&gt;spring-boot-maven-plugin&lt;/artifactId&gt;
+            &lt;/plugin&gt;
+        &lt;/plugins&gt;
+    &lt;/build&gt;
+&lt;/project&gt;</code></pre><p>parent 让项目采用 Spring Boot 4.1.2 管理的依赖版本。这样 Web 组件、JSON 工具和服务器使用兼容的一组版本。relativePath 为空，表示不去上层目录寻找父项目。</p><p>spring-boot-starter-webmvc 带来接收 Web 请求常用的组件，包括 Spring MVC、内置服务器和 JSON 转换支持。它不是我们手写的一个类，而是 Maven 根据这项依赖取来的一组工具。此时先只加这一项，校验和测试用到时再添加。</p><p>build 中的插件让 Maven 能用 spring-boot:run 启动应用。你只需要知道这几块各负责什么，以后查依赖时就能找到该增加的位置。</p><h2>让熟悉的 main 启动服务</h2><p>在 src/main/java/com/example/todo 中创建 TodoApplication.java：</p><pre><code>package com.example.todo;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+@SpringBootApplication
+public class TodoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(TodoApplication.class, args);
+    }
+}</code></pre><p>package 与目录对应。两个 import 引入刚加入的 Spring Boot 工具。main 仍是程序入口，SpringApplication.run 从这里准备应用并启动服务。@SpringBootApplication 标记配置入口，Spring 从这个包向下寻找控制器等组件。</p><h2>写一句真正由我们处理的回复</h2><p>在同一个目录创建 HelloController.java：</p><pre><code>package com.example.todo;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class HelloController {
+    @GetMapping(&quot;/hello&quot;)
+    public String hello() {
+        return &quot;你好，任务清单&quot;;
+    }
+}</code></pre><p>hello 方法只是返回文字。@GetMapping("/hello") 把它与 GET /hello 对应起来。@RestController 告诉 Spring 找到这类处理组件，并把方法返回值写进响应。以前 println 把文字发给终端，这里 return 把文字交给框架，再由框架发给浏览器。</p><h2>告诉它使用哪个端口</h2><p>在 src/main/resources/application.yaml 写下：</p><pre><code>server:
+  port: 8090</code></pre><p>这两行只设置监听端口。server 是一组服务配置，port 是其中的端口，缩进表示它们属于同一组。暂时没有其他配置。</p><p>现在项目中应该有这些文件：</p><pre><code>todo-web/
+├── pom.xml
+└── src/main/
+    ├── java/com/example/todo/
+    │   ├── TodoApplication.java
+    │   └── HelloController.java
+    └── resources/application.yaml</code></pre><p>在含 pom.xml 的目录运行 mvn spring-boot:run。首次需要等待 Maven 获取依赖。服务启动后，在浏览器打开 http://127.0.0.1:8090/hello，应该看到“你好，任务清单”。如果 8090 被占用，先在 YAML 中换一个端口，访问时也使用相同端口。</p><p>这时先顺着代码看一遍：main 启动服务，Spring 找到 HelloController，登记 /hello。浏览器访问时，框架执行 hello，拿到返回文字，写入 HTTP 响应。你已经亲手写完了这一条路。</p><h2>接下来，把同一条路换成查询任务</h2><p>有了 /hello，才开始增加任务。先写 TaskService.java，仍放在同一个包里。它暂时保存内存任务，代码如下：</p><pre><code>package com.example.todo;
+import org.springframework.stereotype.Service;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+@Service
+public class TaskService {
+    public record Task(long id, String content, boolean done) {}
+    // 此阶段只观察 Web 请求；程序重启后，内存中的任务会消失。
+    private final ConcurrentHashMap&lt;Long, Task&gt; tasks = new ConcurrentHashMap&lt;&gt;();
+    private final AtomicLong sequence = new AtomicLong();
+    public Task create(String content) {
+        Task task = new Task(sequence.incrementAndGet(), content.strip(), false);
+        tasks.put(task.id(), task);
+        return task;
+    }
+    public List&lt;Task&gt; list(boolean onlyOpen) {
+        return tasks.values().stream().filter(t -&gt; !onlyOpen || !t.done())
+                .sorted(Comparator.comparingLong(Task::id)).toList();
+    }
+    public Task find(long id) {
+        Task task = tasks.get(id);
+        if (task == null) throw new TaskMissing();
+        return task;
+    }
+    public Task finish(long id) {
+        Task result = tasks.computeIfPresent(id, (key, old) -&gt; new Task(key, old.content(), true));
+        if (result == null) throw new TaskMissing();
+        return result;
+    }
+    public void delete(long id) {
+        if (tasks.remove(id) == null) throw new TaskMissing();
+    }
+    public static class TaskMissing extends RuntimeException {}
+}</code></pre><p>record Task 把编号、内容和状态放在一起。sequence 分配编号，tasks 按编号保存任务；ConcurrentHashMap 和 AtomicLong 用来协调多个请求同时操作的情形。@Service 让 Spring 创建并管理这个对象。list 收集符合条件的任务，find 查单条，create 新增，finish 修改状态，delete 删除。TaskMissing 表达查不到任务，下一篇再把它整理成 HTTP 错误。</p><p>然后创建 TaskController.java，先只接查询：</p><pre><code>package com.example.todo;
+
+import java.util.List;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
 @RequestMapping(&quot;/api/tasks&quot;)
 public class TaskController {
-    // 请求处理方法放在这里
-}</code></pre><p>@RestController 让 Spring 识别这类请求处理组件，并把方法返回值写入响应正文。@RequestMapping 给这里的请求约定共同前缀 /api/tasks。相近功能放在同一前缀下，相当于图片中的 Group 分组。它不自动提供登录保护，共同规则仍要配置。</p><p>类中的查询方法如下：</p><pre><code>@GetMapping
-public List&lt;TaskService.Task&gt; list(
-        @RequestParam(defaultValue=&quot;false&quot;) boolean onlyOpen) {
-    return service.list(onlyOpen);
-}</code></pre><p>@GetMapping 表示接收 GET，没有再写子路径，于是完整地址就是 /api/tasks。你请求 /api/tasks?onlyOpen=true 时，Spring 取出问号后面的 onlyOpen，转换成 boolean 交给方法；没有传时使用 false。这就是查询参数绑定。</p><p>方法调用 service.list，再把列表返回。框架会按已经配置好的消息转换器把数据写成 JSON。你不用在这个方法里再打开输出流、手动拼接 HTTP 头。</p><h2>从整个列表，找到其中一条</h2><p>列表里的每条任务都有编号。想查编号 3，可以让地址带上它：</p><pre><code>@GetMapping(&quot;/{id}&quot;)
-public TaskService.Task find(@PathVariable long id) {
-    return service.find(id);
-}</code></pre><p>请求 /api/tasks/3 时，{id} 匹配路径中的 3，@PathVariable 把它交给 long id。查询参数适合补充筛选条件，路径参数适合指出当前要操作哪项资源。若写成 /api/tasks/abc，abc 无法转换成整数，示例会返回 400。</p><h2>一条新任务怎样出现</h2><p>先用这个请求添加任务，再用响应中的 id 查询它。示例进程刚启动且没有添加过任务时，首个 id 是 1：</p><pre><code>curl -i http://127.0.0.1:8090/api/tasks   -H &#x27;Content-Type: application/json&#x27;   -d &#x27;{&quot;content&quot;:&quot;学习 Spring Boot&quot;}&#x27;</code></pre><p>你会收到 201、Location 头和新任务 JSON。Location 指向新任务地址，接着 GET 这个地址就能看到它。路由已经不再由你手写 switch 分派，Spring 把 POST 交给 create，把 GET 交给 find 或 list。</p><p>示例里的其余请求是：PATCH /api/tasks/1/done 标记完成，DELETE /api/tasks/1 删除。查询 /api/tasks?onlyOpen=true 时，已完成的任务不出现在列表中。这些操作都能在下载的示例里运行。</p><h2>main 还在，只是它启动的东西变了</h2><p>查看 TodoApplication.java，仍然有你熟悉的 main。里面的 SpringApplication.run 会创建应用环境、准备对象并启动内置 Web 服务器。@SpringBootApplication 所在包是扫描其他组件的重要起点，所以示例把控制器和服务放在同一个根包下面。</p><p>以后仍可以通过 main 调试，只是程序启动后一直等待网络请求。原来的 Scanner 由 HTTP 入口接替，TaskDao 等业务与数据代码则可以逐步接回来。</p><p>参考：<a href="https://spring.io/guides/gs/rest-service/">Spring REST 服务入门</a>。</p><footer><a href="framework.html">← 上一篇</a> · <a href="framework-input.html">下一篇 →</a></footer></article></main></div></body></html>
+    private final TaskService service;
+
+    public TaskController(TaskService service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    public List&lt;TaskService.Task&gt; list(
+            @RequestParam(defaultValue=&quot;false&quot;) boolean onlyOpen) {
+        return service.list(onlyOpen);
+    }
+
+    @GetMapping(&quot;/{id}&quot;)
+    public TaskService.Task find(@PathVariable long id) {
+        return service.find(id);
+    }
+}</code></pre><p>类上的 /api/tasks 给这组接口共同前缀。没有子路径的 @GetMapping 查列表；/{id} 把 /api/tasks/3 中的 3 交给 long id；@RequestParam 则读取 ?onlyOpen=true。路径说明操作哪条任务，查询参数补充筛选条件。构造方法把 TaskService 交进来，这段装配会在工程化一篇继续解释。</p><p>每次改完先停止旧进程，再运行 mvn spring-boot:run。访问 /api/tasks 会看到 []，因为此时还没有接收新增请求。下一篇就在这个自己写好的工程上接 POST，不需要另外取一份项目。</p><footer><a href="framework.html">← 上一篇</a> · <a href="framework-input.html">下一篇 →</a></footer></article></main></div></body></html>

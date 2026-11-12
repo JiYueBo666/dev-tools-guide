@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>收到的内容，怎样放心使用？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">13 / SPRING BOOT</div><h1>收到的内容，怎样放心使用？</h1><p class="lead">输入框里的文字进了服务器，还不能直接当成合适的任务。</p><p>有人会输入空格，有人会忘记字段，也有人会一次上传很大的文件。网页可以先提醒，但请求也能从 curl 或其他程序发来，后端需要自己检查。</p><p>先把两件事分开：读懂格式，才能知道发来了什么；检查内容，才能决定这份输入是否可用。Spring MVC 的绑定负责前一件事，校验规则负责后一件事。</p><h2>JSON 先变成一个有名字的 Java 参数</h2><p>在 TaskController 中，创建任务的方法接收一个 CreateTask：</p><pre><code>public record CreateTask(
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>收到的内容，怎样放心使用？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">13 / SPRING BOOT</div><h1>收到的内容，怎样放心使用？</h1><p class="lead">输入框里的文字进了服务器，还不能直接当成合适的任务。</p><p>有人会输入空格，有人会忘记字段，也有人会一次上传很大的文件。网页可以先提醒，但请求也能从 curl 或其他程序发来，后端需要自己检查。</p><p>先把两件事分开：读懂格式，才能知道发来了什么；检查内容，才能决定这份输入是否可用。Spring MVC 的绑定负责前一件事，校验规则负责后一件事。</p><h2>JSON 先变成一个有名字的 Java 参数</h2><p>接着上一篇的 TaskController，我们增加创建任务的方法。它接收一个 CreateTask：</p><pre><code>public record CreateTask(
     @NotBlank(message=&quot;请输入任务内容&quot;)
     @Size(max=200, message=&quot;任务最多200个字符&quot;)
     String content
@@ -10,7 +10,7 @@ public ResponseEntity&lt;TaskService.Task&gt; create(
     var task = service.create(request.content());
     return ResponseEntity.created(
         URI.create(&quot;/api/tasks/&quot; + task.id())).body(task);
-}</code></pre><p>record 是 Java 声明简单数据载体的一种写法，这里保存 content，并自动提供 content() 读取方法。@RequestBody 告诉 Spring 从请求正文读取，交给 JSON 转换器生成 CreateTask。@Valid 请框架按这个对象上的规则检查。@NotBlank 不接受 null、空字符串和纯空白，@Size 限制长度。</p><p>所以 JSON 写坏了，先在读取阶段失败；JSON 合法但 content 全是空格，则在校验阶段失败。只有通过这些步骤，才会进入 create 的业务代码。图片中的 ShouldBind 与 validator tag，在这里承担相近工作的就是这组写法。</p><h2>为什么还需要 service 检查业务</h2><p>文字非空不代表业务一定允许。例如“每天最多建 20 条”，需要知道这个用户今天已有多少任务。校验注解适合表达字段本身的约束，service 再根据用户、数据库状态等信息判断是否允许操作。</p><p>这些不同失败，网页都需要清楚的回复。下载示例中的 ApiErrors 把输入问题整理成 400，把查不到任务整理成 404，正文都包含 code、message、requestId。后端给出稳定字段，网页就不必猜测不同异常文本的含义。</p><h2>有人上传一张作业截图</h2><p>文本任务跑通后，可以让任务附带截图。文件与 JSON 的发送方式不同，通常用 multipart/form-data。它像一个分了格子的包裹，可以同时放普通字段和文件内容。</p><p>下面是可放进控制器中的方法片段，需要引入 MultipartFile、Files、Path、UUID、Map 和 IOException 等类型。它保存到本机上传目录并返回随机文件编号；这是独立功能扩展示意，下载示例尚未注册该接口：</p><pre><code>@PostMapping(&quot;/attachments&quot;)
+}</code></pre><p>record 是 Java 声明简单数据载体的一种写法，这里保存 content，并自动提供 content() 读取方法。@RequestBody 告诉 Spring 从请求正文读取，交给 JSON 转换器生成 CreateTask。@Valid 请框架按这个对象上的规则检查。@NotBlank 不接受 null、空字符串和纯空白，@Size 限制长度。</p><p>所以 JSON 写坏了，先在读取阶段失败；JSON 合法但 content 全是空格，则在校验阶段失败。只有通过这些步骤，才会进入 create 的业务代码。图片中的 ShouldBind 与 validator tag，在这里承担相近工作的就是这组写法。</p><h2>为什么还需要 service 检查业务</h2><p>文字非空不代表业务一定允许。例如“每天最多建 20 条”，需要知道这个用户今天已有多少任务。校验注解适合表达字段本身的约束，service 再根据用户、数据库状态等信息判断是否允许操作。</p><p>这些不同失败，网页都需要清楚的回复。后面要写的 ApiErrors 把输入问题整理成 400，把查不到任务整理成 404，正文都包含 code、message、requestId。后端给出稳定字段，网页就不必猜测不同异常文本的含义。</p><h2>有人上传一张作业截图</h2><p>文本任务跑通后，可以让任务附带截图。文件与 JSON 的发送方式不同，通常用 multipart/form-data。它像一个分了格子的包裹，可以同时放普通字段和文件内容。</p><p>下面是可放进控制器中的方法片段，需要引入 MultipartFile、Files、Path、UUID、Map 和 IOException 等类型。它保存到本机上传目录并返回随机文件编号；这是独立功能扩展示意，我们接下来的基本任务接口中尚未注册这个上传方法：</p><pre><code>@PostMapping(&quot;/attachments&quot;)
 public Map&lt;String, String&gt; upload(
         @RequestParam(&quot;file&quot;) MultipartFile file) throws IOException {
     if (file.isEmpty()) {
@@ -23,4 +23,87 @@ public Map&lt;String, String&gt; upload(
         Files.copy(input, root.resolve(id));
     }
     return Map.of(&quot;fileId&quot;, id);
-}</code></pre><p>这里不用用户提供的原始文件名直接拼路径，而是由服务端生成名字。这样不会因为有人把文件名写成 ../某个文件而跑出上传目录。真正作为图片使用前，还要核实文件内容、允许的类型与大小；浏览器给的 Content-Type 只能当作线索。</p><p>配置中的 max-file-size: 2MB 限制单文件，max-request-size: 3MB 限制整个请求。需要在异常处理里给超限、空文件等情况补充明确错误；不能让默认的意外错误兜底替所有问题分类。原始文件也不要任意当作可执行页面公开提供。</p><p>若添加了该方法，可用 curl -F 'file=@./作业截图.png' http://127.0.0.1:8090/api/tasks/attachments 发送。curl 会生成 multipart 边界，无需自己手写 Content-Type 的边界字符串。</p><h2>返回值也需要一份共同约定</h2><p>示例选择直接返回任务或列表，失败统一使用错误对象，删除成功用 204。这是完整一致的一种接口约定。若团队约定所有成功响应包成 {data: ...}，可以定义 ApiResponse<T>，让控制器统一返回这个类型。约定改变时，前端与测试一起调整；不要只改部分接口。</p><p>@RestControllerAdvice 会集中查找适用的异常处理方法。业务方法抛出“找不到任务”，对应方法返回 404；意外异常留在日志中，客户端只收到一般性的 500 提示。它主要接住 MVC 处理链里的异常，过滤器或异步线程中的失败需要在各自边界处理。Java 的 Error 通常不该像普通业务异常一样全部吞掉。</p><p>参考：<a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/requestbody.html">请求绑定与校验</a>、<a href="https://spring.io/guides/gs/uploading-files/">文件上传</a>、<a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-advice.html">统一异常处理</a>。</p><footer><a href="framework-start.html">← 上一篇</a> · <a href="framework-chain.html">下一篇 →</a></footer></article></main></div></body></html>
+}</code></pre><p>这里不用用户提供的原始文件名直接拼路径，而是由服务端生成名字。这样不会因为有人把文件名写成 ../某个文件而跑出上传目录。真正作为图片使用前，还要核实文件内容、允许的类型与大小；浏览器给的 Content-Type 只能当作线索。</p><p>如果接入上传，再在 application.yaml 的 spring.servlet.multipart 下配置 max-file-size: 2MB 和 max-request-size: 3MB，分别限制单文件和整个请求。需要在异常处理里给超限、空文件等情况补充明确错误；不能让默认的意外错误兜底替所有问题分类。原始文件也不要任意当作可执行页面公开提供。</p><p>若添加了该方法，可用 curl -F 'file=@./作业截图.png' http://127.0.0.1:8090/api/tasks/attachments 发送。curl 会生成 multipart 边界，无需自己手写 Content-Type 的边界字符串。</p><h2>返回值也需要一份共同约定</h2><p>我们这一版选择直接返回任务或列表，失败统一使用错误对象，删除成功用 204。这是完整一致的一种接口约定。若团队约定所有成功响应包成 {data: ...}，可以定义 ApiResponse<T>，让控制器统一返回这个类型。约定改变时，前端与测试一起调整；不要只改部分接口。</p><p>@RestControllerAdvice 会集中查找适用的异常处理方法。业务方法抛出“找不到任务”，对应方法返回 404；意外异常留在日志中，客户端只收到一般性的 500 提示。它主要接住 MVC 处理链里的异常，过滤器或异步线程中的失败需要在各自边界处理。Java 的 Error 通常不该像普通业务异常一样全部吞掉。</p><p>参考：<a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/requestbody.html">请求绑定与校验</a>、<a href="https://spring.io/guides/gs/uploading-files/">文件上传</a>、<a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-advice.html">统一异常处理</a>。</p><h2>把刚才解释的内容放进自己的文件</h2><p>先在 pom.xml 原有 dependencies 中增加校验工具。版本仍由 parent 管理：</p><pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-validation&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre><p>保持上一篇的 TaskService 不变。现在用下面的完整内容更新 TaskController.java；查询方法保留，新增创建、完成和删除。每个方法都继续把业务交给 service：</p><pre><code>package com.example.todo;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.net.URI;
+import java.util.List;
+@RestController
+@RequestMapping(&quot;/api/tasks&quot;)
+public class TaskController {
+    public record CreateTask(@NotBlank(message=&quot;请输入任务内容&quot;) @Size(max=200, message=&quot;任务最多200个字符&quot;) String content) {}
+    private final TaskService service;
+    public TaskController(TaskService service) { this.service = service; }
+    @GetMapping
+    public List&lt;TaskService.Task&gt; list(@RequestParam(defaultValue=&quot;false&quot;) boolean onlyOpen) {
+        return service.list(onlyOpen);
+    }
+    @GetMapping(&quot;/{id}&quot;)
+    public TaskService.Task find(@PathVariable long id) { return service.find(id); }
+    @PostMapping
+    public ResponseEntity&lt;TaskService.Task&gt; create(@Valid @RequestBody CreateTask request) {
+        var task = service.create(request.content());
+        return ResponseEntity.created(URI.create(&quot;/api/tasks/&quot; + task.id())).body(task);
+    }
+    @PatchMapping(&quot;/{id}/done&quot;)
+    public TaskService.Task finish(@PathVariable long id) { return service.finish(id); }
+    @DeleteMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;Void&gt; delete(@PathVariable long id) {
+        service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+}</code></pre><p>再在同包新建 ApiErrors.java。@ExceptionHandler 上列出的异常类型决定交给哪个方法；方法返回的状态码和 ErrorBody 就是用户看到的结果。请求编号还没接入时，requestId 可以是 null，下一篇再补上：</p><pre><code>package com.example.todo;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+@RestControllerAdvice
+public class ApiErrors {
+    private static final Logger log = LoggerFactory.getLogger(ApiErrors.class);
+    public record ErrorBody(String code, String message, Object requestId) {}
+    private ResponseEntity&lt;ErrorBody&gt; error(int status, String code, String message, HttpServletRequest request) {
+        return ResponseEntity.status(status).body(new ErrorBody(code, message, request.getAttribute(&quot;requestId&quot;)));
+    }
+    @ExceptionHandler(TaskService.TaskMissing.class)
+    public ResponseEntity&lt;ErrorBody&gt; missing(HttpServletRequest request) {
+        return error(404, &quot;TASK_NOT_FOUND&quot;, &quot;没有找到这条任务&quot;, request);
+    }
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity&lt;ErrorBody&gt; invalid(MethodArgumentNotValidException ex, HttpServletRequest request) {
+        var field = ex.getBindingResult().getFieldError();
+        return error(400, &quot;INVALID_INPUT&quot;, field == null ? &quot;请检查输入&quot; : field.getDefaultMessage(), request);
+    }
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+    public ResponseEntity&lt;ErrorBody&gt; malformed(HttpServletRequest request) {
+        return error(400, &quot;INVALID_REQUEST&quot;, &quot;请求格式不正确&quot;, request);
+    }
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity&lt;ErrorBody&gt; method(org.springframework.web.HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(405).allow(ex.getSupportedHttpMethods().toArray(org.springframework.http.HttpMethod[]::new))
+                .body(new ErrorBody(&quot;METHOD_NOT_ALLOWED&quot;, &quot;这个地址不接受此请求方法&quot;, request.getAttribute(&quot;requestId&quot;)));
+    }
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity&lt;ErrorBody&gt; media(HttpServletRequest request) {
+        return error(415, &quot;UNSUPPORTED_MEDIA_TYPE&quot;, &quot;请检查请求内容类型&quot;, request);
+    }
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity&lt;ErrorBody&gt; route(HttpServletRequest request) {
+        return error(404, &quot;ROUTE_NOT_FOUND&quot;, &quot;没有找到这个地址&quot;, request);
+    }
+    // 最后的兜底：记录意外异常，不把内部堆栈发给用户。
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;ErrorBody&gt; unexpected(Exception ex, HttpServletRequest request) {
+        log.error(&quot;request failed&quot;, ex);
+        return error(500, &quot;INTERNAL_ERROR&quot;, &quot;操作暂时失败，请稍后再试&quot;, request);
+    }
+}</code></pre><p>文件齐全后，重启服务，再在另一个终端添加一条任务：</p><pre><code>curl -i http://127.0.0.1:8090/api/tasks   -H &#x27;Content-Type: application/json&#x27;   -d &#x27;{&quot;content&quot;:&quot;学习 Spring Boot&quot;}&#x27;</code></pre><p>你应看到 201 和新任务。再把 content 改成空字符串，应该看到 400 和 INVALID_INPUT。/api/tasks 列表会保留刚才有效的任务。这里每一段请求处理、数据保存和错误回复，都对应你刚写的一个文件。</p><footer><a href="framework-start.html">← 上一篇</a> · <a href="framework-chain.html">下一篇 →</a></footer></article></main></div></body></html>

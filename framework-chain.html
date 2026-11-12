@@ -1,8 +1,8 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>每条请求都要做的事，放在哪里？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">13 / SPRING BOOT</div><h1>每条请求都要做的事，放在哪里？</h1><p class="lead">每个接口都写日志、查身份、处理跨域，很快就会写出许多相似代码。</p><p>你可以把一次请求经过的路想成办事窗口前的通道。先记下到达时间，核验必要凭证，然后交给具体窗口。窗口处理完，还要记录结果和耗时。各个窗口办不同业务，共同流程却可以只安排一次。</p><p>在 Spring MVC 中，Servlet Filter 可以围绕请求处理。拦截器也能在控制器执行前后参与，并更接近 MVC 的处理方法信息。它们都可以承担部分公共工作，使用位置要结合执行范围选择。</p><h2>先让同一条请求留下一个编号</h2><p>你点添加后出了错，服务器上可能同时有很多人的请求。只写“保存失败”，很难知道对应谁的哪次操作。下载示例中的 RequestLogFilter 给每条请求生成 requestId，放进响应头 X-Request-ID，也放进错误响应。</p><p>日志中带同一个编号，排查时就能把接收、处理和失败几段信息连起来。这里的 requestId 标识一次应用请求；如果跨多个服务传播，需要进一步接入分布式 traceId，而不能只靠每个服务各生成一段编号。</p><h2>请求向里走，响应再往外回来</h2><p>过滤器的主要结构是：</p><pre><code>try {
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>每条请求都要做的事，放在哪里？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">13 / SPRING BOOT</div><h1>每条请求都要做的事，放在哪里？</h1><p class="lead">每个接口都写日志、查身份、处理跨域，很快就会写出许多相似代码。</p><p>你可以把一次请求经过的路想成办事窗口前的通道。先记下到达时间，核验必要凭证，然后交给具体窗口。窗口处理完，还要记录结果和耗时。各个窗口办不同业务，共同流程却可以只安排一次。</p><p>在 Spring MVC 中，Servlet Filter 可以围绕请求处理。拦截器也能在控制器执行前后参与，并更接近 MVC 的处理方法信息。它们都可以承担部分公共工作，使用位置要结合执行范围选择。</p><h2>先让同一条请求留下一个编号</h2><p>你点添加后出了错，服务器上可能同时有很多人的请求。只写“保存失败”，很难知道对应谁的哪次操作。这一篇要写的 RequestLogFilter 给每条请求生成 requestId，放进响应头 X-Request-ID，也放进错误响应。</p><p>日志中带同一个编号，排查时就能把接收、处理和失败几段信息连起来。这里的 requestId 标识一次应用请求；如果跨多个服务传播，需要进一步接入分布式 traceId，而不能只靠每个服务各生成一段编号。</p><h2>请求向里走，响应再往外回来</h2><p>过滤器的主要结构是：</p><pre><code>try {
     chain.doFilter(request, response);
 } finally {
     // 记录耗时，并清理本次请求放入的日志上下文
-}</code></pre><p>chain.doFilter 把请求交给后面的处理环节。调用之前做的事先发生；后面的环节结束，程序再回到这里执行 finally。多个过滤器形成链，先进入的外层通常最后收尾。如果不继续调用链，可以提前结束请求，例如返回拒绝访问。</p><p>示例用 request.setAttribute 保存 requestId，下游通过同一个 request 取出。这是一次请求范围内传值。日志的 MDC 则让当前线程的日志带上编号；线程会复用，所以 finally 必须清理，避免下一次请求带上上一个人的编号。进入异步线程后，不能假定这些线程上下文自动传过去。</p><h2>登录检查与任务权限各守一段</h2><p>所有“我的任务”都需要先确认用户身份，适合集中放在认证链中。认出用户以后，service 仍要确认任务是否属于这个用户。只验证登录，无法阻止小明修改别人的任务编号。</p><p>正式登录应使用 Spring Security 等成熟组件，把认证、访问控制与会话策略接好。下载的观察示例只绑定本机地址，没有实现登录，不应当作已鉴权的多人服务公开使用。</p><p>跨域也可以集中配置允许的网页来源、方法和头部。带 Cookie 时需要具体来源与凭证规则，先前 HTTP 教程中的要求仍然适用。使用 Spring Security 时，要与安全链的 CORS 配置协作，让 OPTIONS 预检得到合适处理，避免先被登录规则一概拦住。</p><h2>若页面运行在另一个端口</h2><p>为了把前面 HTTP 教程中的跨域规则接到框架里，可以新增 WebConfig.java。下面是完整配置类，放在 com.example.todo 包中；导入依赖已包含在 Web MVC starter 里：</p><pre><code>package com.example.todo;
+}</code></pre><p>chain.doFilter 把请求交给后面的处理环节。调用之前做的事先发生；后面的环节结束，程序再回到这里执行 finally。多个过滤器形成链，先进入的外层通常最后收尾。如果不继续调用链，可以提前结束请求，例如返回拒绝访问。</p><p>示例用 request.setAttribute 保存 requestId，下游通过同一个 request 取出。这是一次请求范围内传值。日志的 MDC 则让当前线程的日志带上编号；线程会复用，所以 finally 必须清理，避免下一次请求带上上一个人的编号。进入异步线程后，不能假定这些线程上下文自动传过去。</p><h2>登录检查与任务权限各守一段</h2><p>所有“我的任务”都需要先确认用户身份，适合集中放在认证链中。认出用户以后，service 仍要确认任务是否属于这个用户。只验证登录，无法阻止小明修改别人的任务编号。</p><p>正式登录应使用 Spring Security 等成熟组件，把认证、访问控制与会话策略接好。目前这份练习还没有实现登录，接入多人使用前需要补齐身份与任务归属检查。</p><p>跨域也可以集中配置允许的网页来源、方法和头部。带 Cookie 时需要具体来源与凭证规则，先前 HTTP 教程中的要求仍然适用。使用 Spring Security 时，要与安全链的 CORS 配置协作，让 OPTIONS 预检得到合适处理，避免先被登录规则一概拦住。</p><h2>若页面运行在另一个端口</h2><p>为了把前面 HTTP 教程中的跨域规则接到框架里，可以新增 WebConfig.java。下面是完整配置类，放在 com.example.todo 包中；导入依赖已包含在 Web MVC starter 里：</p><pre><code>package com.example.todo;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -16,4 +16,36 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedMethods(&quot;GET&quot;, &quot;POST&quot;, &quot;PATCH&quot;, &quot;DELETE&quot;, &quot;OPTIONS&quot;)
                 .allowedHeaders(&quot;Content-Type&quot;);
     }
-}</code></pre><p>这份配置允许 8080 的网页读取 /api/ 下的接口。后端端口仍是 8090，所以来自其他来源的网页不在这份许可中。等接入 Cookie 登录时，再明确配置凭证与安全链；这份配置没有启用跨源凭证。它属于可选扩展，下载示例默认同源或直接用 curl 访问。</p><h2>请求太多时，怎样让服务喘口气</h2><p>如果有人每秒点击几百次，后端和数据库可能忙不过来。限流可以为某个身份、接口或来源限制一段时间内的请求量。超过时返回 429，必要时带 Retry-After，告诉客户端稍后再试。</p><p>一个小项目可以先理解令牌桶的直觉：桶中有限额，来一次请求用掉一个，额度按一定速度补回；桶空就暂时拒绝。按 IP 限制可能把同一网络的多人算在一起，按用户限制则依赖可靠身份。多个应用实例还需要共同计数或分布式限流方案，不能认为每个进程单独计数就是全站限额。</p><p>限流组件可以放在网关或应用过滤链中，但应由经过验证的组件承担并发计数与时间处理。把规则写清楚，比为了加一个过滤器就随意设置阈值更重要。</p><h2>这些步骤为什么要有顺序</h2><p>先取得请求编号，后面的错误日志才好追踪；先识别用户，才便于按用户限流；需要放行的预检应在合适位置处理。不同规则的次序会改变结果，因此新增公共环节时，要同时想它应当围住谁、又会被谁围住。</p><p>这条链承担共同责任，Controller 继续关心任务请求。这样修改一次日志规则，不必翻遍每个任务方法。</p><footer><a href="framework-input.html">← 上一篇</a> · <a href="framework-project.html">下一篇 →</a></footer></article></main></div></body></html>
+}</code></pre><p>这份配置允许 8080 的网页读取 /api/ 下的接口。后端端口仍是 8090，所以来自其他来源的网页不在这份许可中。等接入 Cookie 登录时，再明确配置凭证与安全链；这份配置没有启用跨源凭证。它属于可选扩展，前面的接口可以先直接用 curl 访问。</p><h2>请求太多时，怎样让服务喘口气</h2><p>如果有人每秒点击几百次，后端和数据库可能忙不过来。限流可以为某个身份、接口或来源限制一段时间内的请求量。超过时返回 429，必要时带 Retry-After，告诉客户端稍后再试。</p><p>一个小项目可以先理解令牌桶的直觉：桶中有限额，来一次请求用掉一个，额度按一定速度补回；桶空就暂时拒绝。按 IP 限制可能把同一网络的多人算在一起，按用户限制则依赖可靠身份。多个应用实例还需要共同计数或分布式限流方案，不能认为每个进程单独计数就是全站限额。</p><p>限流组件可以放在网关或应用过滤链中，但应由经过验证的组件承担并发计数与时间处理。把规则写清楚，比为了加一个过滤器就随意设置阈值更重要。</p><h2>这些步骤为什么要有顺序</h2><p>先取得请求编号，后面的错误日志才好追踪；先识别用户，才便于按用户限流；需要放行的预检应在合适位置处理。不同规则的次序会改变结果，因此新增公共环节时，要同时想它应当围住谁、又会被谁围住。</p><p>这条链承担共同责任，Controller 继续关心任务请求。这样修改一次日志规则，不必翻遍每个任务方法。</p><h2>亲手把请求编号接进来</h2><p>在 com.example.todo 包中创建 RequestLogFilter.java。文件顶部的 servlet 类型来自 Web 依赖，Logger 和 MDC 来自框架提供的日志组件；UUID 是 Java 自带工具。</p><pre><code>package com.example.todo;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+import java.io.IOException;
+import java.util.UUID;
+@Component
+public class RequestLogFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(RequestLogFilter.class);
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+        // 教学服务生成自己的编号，不直接相信客户端提供的编号。
+        String requestId = UUID.randomUUID().toString();
+        request.setAttribute(&quot;requestId&quot;, requestId);
+        response.setHeader(&quot;X-Request-ID&quot;, requestId);
+        MDC.put(&quot;requestId&quot;, requestId);
+        long start = System.nanoTime();
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            log.info(&quot;method={} path={} status={} durationMs={}&quot;, request.getMethod(), request.getRequestURI(),
+                    response.getStatus(), (System.nanoTime() - start) / 1_000_000);
+            MDC.remove(&quot;requestId&quot;);
+        }
+    }
+}</code></pre><p>沿着 doFilterInternal 读：生成编号，放进 request 和响应头，把请求交给后面，最后记录耗时并清理 MDC。重启后用 curl -i 查询列表，可以看到 X-Request-ID。错误正文也会获得同一个编号。日志显示格式在下一篇集中配置。</p><footer><a href="framework-input.html">← 上一篇</a> · <a href="framework-project.html">下一篇 →</a></footer></article></main></div></body></html>
