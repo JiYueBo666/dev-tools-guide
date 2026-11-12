@@ -1,0 +1,14 @@
+server:
+  address: 127.0.0.1
+  port: ${PORT:8090}
+logging:
+  level:
+    root: INFO
+    com.example.todo: INFO
+  pattern:
+    console: "%d{HH:mm:ss} %-5level [%X{requestId}] %logger{24} - %msg%n"
+spring:
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB

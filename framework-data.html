@@ -1,0 +1,36 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>把内存里的任务交给数据库 | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">13 / SPRING BOOT</div><h1>把内存里的任务交给数据库</h1><p class="lead">重启后列表清空，说明任务仍只住在程序内存里。现在把保存责任交出去。</p><p>你已经用 JDBC 和 MySQL 保存过任务。Spring 不会改变数据库的基本工作，只会帮你管理连接、组织对象，并提供更少重复代码的访问方式。</p><p>先保持现有 MySQL 项目不动。框架数据库练习应使用独立数据库，例如 todo_framework_lab，并配置专用账号。示例下载包仍是内存版本，这一篇中的代码与配置是在旁边扩展时要加的部分。</p><h2>连接为什么可以借来再归还</h2><p>以前每次 DriverManager.getConnection 都可能新建连接，用完关闭。并发请求多时，反复建立连接会带来成本。连接池先管理一组连接，请求需要时借用，用完归还，后面的请求再复用。</p><p>Java 用 DataSource 提供这类连接入口。Spring Boot 常用 HikariCP 管理连接池。使用 JDBC 或 Data JPA starter 时通常会自动带上它，创建和回收过程由框架协助。</p><p>连接池不是越大越好。数据库能处理的连接有限，多个应用实例的连接还要相加。可先从小规模练习值开始：</p><pre><code>spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 3000
+      max-lifetime: 1500000</code></pre><p>这段放在 application.yaml 的数据库配置中。最多 5 条连接，空闲时至少保留 1 条；借不到连接时最多等待 3000 毫秒；max-lifetime 控制连接在池中的最长寿命，常规情况下使用中的连接不会被强行中断，而是在归还后按规则回收。参数需要配合数据库和网络的超时限制，示例数字不是所有项目的标准答案。</p><p>用完连接必须关闭，在池化场景下 close 通常表示归还给池。长时间占着连接、查询过慢或事务过大，都会让后续请求排队。</p><h2>从自己写 SQL，到让映射工具帮忙</h2><p>如果继续使用熟悉的 SQL，可以先用 Spring JDBC/JdbcTemplate；它帮你管理重复的连接与异常处理。想进一步用 Java 对象表达表中的记录，可以使用 JPA 与 Hibernate。JPA 是一套持久化约定，Hibernate 是常用实现，Spring Data JPA 又提供便捷的 Repository 接口。</p><p>这一步对应图片里 GORM 所解决的对象与数据表映射问题。需要在 pom.xml 增加 spring-boot-starter-data-jpa 和运行时 mysql-connector-j，版本交给本示例的 Spring Boot 依赖管理。可从 <a href="https://docs.spring.io/spring-boot/reference/data/sql.html">数据库官方文档</a>查依赖与配置。</p><h2>给一条任务标明怎样保存</h2><p>新建独立的 TaskEntity.java，放在 com.example.todo 包中。下面是一个完整的实体类，需要已经加入 JPA 依赖：</p><pre><code>package com.example.todo;
+import jakarta.persistence.*;
+
+@Entity
+@Table(name=&quot;tasks&quot;)
+public class TaskEntity {
+    @Id
+    @GeneratedValue(strategy=GenerationType.IDENTITY)
+    private Long id;
+    @Column(nullable=false, length=200)
+    private String content;
+    @Column(nullable=false)
+    private boolean done;
+
+    protected TaskEntity() {}
+    public TaskEntity(String content) { this.content = content; }
+    public Long getId() { return id; }
+    public String getContent() { return content; }
+    public boolean isDone() { return done; }
+    public void finish() { done = true; }
+}</code></pre><p>@Entity 让映射工具知道它对应可持久化的数据，@Table 指定表名。@Id 标识编号，IDENTITY 使用数据库生成编号。protected 无参数构造方法供持久化工具创建对象。业务则通过有内容的构造方法创建新任务。</p><p>再在 TaskRepository.java 声明：</p><pre><code>package com.example.todo;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+
+public interface TaskRepository extends JpaRepository&lt;TaskEntity, Long&gt; {
+    List&lt;TaskEntity&gt; findByDoneFalseOrderByIdAsc();
+}</code></pre><p>Spring Data 根据接口准备实现，继承来的 save、findById、delete 等承担基础操作。这个长方法名表达“找未完成任务，按编号升序”。复杂查询仍可能需要显式 JPQL 或 SQL，框架没有替你消除理解查询的需要。</p><h2>接回 service 时，事务放在哪里</h2><p>创建任务时，service 可以调用 repository.save(new TaskEntity(content))。完成任务时，service 按 id 找实体，找不到抛出业务异常，找到后调用 finish。把这一整个业务过程放到 Spring 管理的 @Transactional 方法里，在同一事务中完成；受管理实体的变化会在提交前同步到数据库。</p><p>Controller 继续返回专门的响应数据，不直接把带关联和内部字段的实体全部暴露出去。这样数据库表变化时，接口不必跟着泄露每个细节。</p><p>初始化数据库时要明确由谁建表。练习可在专用库中使用 ddl-auto: update 理解现象；长期项目应使用 Flyway/Liquibase 等版本迁移，并常用 validate 检查映射。不要把 create 或 create-drop 配到已有任务数据库上。</p><p>参考：<a href="https://docs.spring.io/spring-boot/reference/data/sql.html">连接池与数据访问</a>、<a href="https://docs.spring.io/spring-data/jpa/reference/jpa/transactions.html">JPA 事务</a>。</p><footer><a href="framework-project.html">← 上一篇</a> · <a href="framework-orm.html">下一篇 →</a></footer></article></main></div></body></html>

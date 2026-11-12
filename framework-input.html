@@ -1,0 +1,26 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>收到的内容，怎样放心使用？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">13 / SPRING BOOT</div><h1>收到的内容，怎样放心使用？</h1><p class="lead">输入框里的文字进了服务器，还不能直接当成合适的任务。</p><p>有人会输入空格，有人会忘记字段，也有人会一次上传很大的文件。网页可以先提醒，但请求也能从 curl 或其他程序发来，后端需要自己检查。</p><p>先把两件事分开：读懂格式，才能知道发来了什么；检查内容，才能决定这份输入是否可用。Spring MVC 的绑定负责前一件事，校验规则负责后一件事。</p><h2>JSON 先变成一个有名字的 Java 参数</h2><p>在 TaskController 中，创建任务的方法接收一个 CreateTask：</p><pre><code>public record CreateTask(
+    @NotBlank(message=&quot;请输入任务内容&quot;)
+    @Size(max=200, message=&quot;任务最多200个字符&quot;)
+    String content
+) {}
+
+@PostMapping
+public ResponseEntity&lt;TaskService.Task&gt; create(
+        @Valid @RequestBody CreateTask request) {
+    var task = service.create(request.content());
+    return ResponseEntity.created(
+        URI.create(&quot;/api/tasks/&quot; + task.id())).body(task);
+}</code></pre><p>record 是 Java 声明简单数据载体的一种写法，这里保存 content，并自动提供 content() 读取方法。@RequestBody 告诉 Spring 从请求正文读取，交给 JSON 转换器生成 CreateTask。@Valid 请框架按这个对象上的规则检查。@NotBlank 不接受 null、空字符串和纯空白，@Size 限制长度。</p><p>所以 JSON 写坏了，先在读取阶段失败；JSON 合法但 content 全是空格，则在校验阶段失败。只有通过这些步骤，才会进入 create 的业务代码。图片中的 ShouldBind 与 validator tag，在这里承担相近工作的就是这组写法。</p><h2>为什么还需要 service 检查业务</h2><p>文字非空不代表业务一定允许。例如“每天最多建 20 条”，需要知道这个用户今天已有多少任务。校验注解适合表达字段本身的约束，service 再根据用户、数据库状态等信息判断是否允许操作。</p><p>这些不同失败，网页都需要清楚的回复。下载示例中的 ApiErrors 把输入问题整理成 400，把查不到任务整理成 404，正文都包含 code、message、requestId。后端给出稳定字段，网页就不必猜测不同异常文本的含义。</p><h2>有人上传一张作业截图</h2><p>文本任务跑通后，可以让任务附带截图。文件与 JSON 的发送方式不同，通常用 multipart/form-data。它像一个分了格子的包裹，可以同时放普通字段和文件内容。</p><p>下面是可放进控制器中的方法片段，需要引入 MultipartFile、Files、Path、UUID、Map 和 IOException 等类型。它保存到本机上传目录并返回随机文件编号；这是独立功能扩展示意，下载示例尚未注册该接口：</p><pre><code>@PostMapping(&quot;/attachments&quot;)
+public Map&lt;String, String&gt; upload(
+        @RequestParam(&quot;file&quot;) MultipartFile file) throws IOException {
+    if (file.isEmpty()) {
+        throw new IllegalArgumentException(&quot;请选择文件&quot;);
+    }
+    Path root = Path.of(&quot;uploads&quot;).toAbsolutePath();
+    Files.createDirectories(root);
+    String id = UUID.randomUUID().toString();
+    try (var input = file.getInputStream()) {
+        Files.copy(input, root.resolve(id));
+    }
+    return Map.of(&quot;fileId&quot;, id);
+}</code></pre><p>这里不用用户提供的原始文件名直接拼路径，而是由服务端生成名字。这样不会因为有人把文件名写成 ../某个文件而跑出上传目录。真正作为图片使用前，还要核实文件内容、允许的类型与大小；浏览器给的 Content-Type 只能当作线索。</p><p>配置中的 max-file-size: 2MB 限制单文件，max-request-size: 3MB 限制整个请求。需要在异常处理里给超限、空文件等情况补充明确错误；不能让默认的意外错误兜底替所有问题分类。原始文件也不要任意当作可执行页面公开提供。</p><p>若添加了该方法，可用 curl -F 'file=@./作业截图.png' http://127.0.0.1:8090/api/tasks/attachments 发送。curl 会生成 multipart 边界，无需自己手写 Content-Type 的边界字符串。</p><h2>返回值也需要一份共同约定</h2><p>示例选择直接返回任务或列表，失败统一使用错误对象，删除成功用 204。这是完整一致的一种接口约定。若团队约定所有成功响应包成 {data: ...}，可以定义 ApiResponse<T>，让控制器统一返回这个类型。约定改变时，前端与测试一起调整；不要只改部分接口。</p><p>@RestControllerAdvice 会集中查找适用的异常处理方法。业务方法抛出“找不到任务”，对应方法返回 404；意外异常留在日志中，客户端只收到一般性的 500 提示。它主要接住 MVC 处理链里的异常，过滤器或异步线程中的失败需要在各自边界处理。Java 的 Error 通常不该像普通业务异常一样全部吞掉。</p><p>参考：<a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/requestbody.html">请求绑定与校验</a>、<a href="https://spring.io/guides/gs/uploading-files/">文件上传</a>、<a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-advice.html">统一异常处理</a>。</p><footer><a href="framework-start.html">← 上一篇</a> · <a href="framework-chain.html">下一篇 →</a></footer></article></main></div></body></html>
