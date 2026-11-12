@@ -1,0 +1,25 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第六课：页面、接口和数据库，放在哪里？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="web.html">网页与 HTTP 学习路线</a></header><div class="layout"><aside><div class="side-title">从终端走向网页</div><a href="web.html">让浏览器也能使用任务清单</a><a href="web-http.html">第一课：一条任务怎么从网页发出去？</a><a href="web-cache.html">第二课：没变化的东西，为什么还要下载？</a><a href="web-connection.html">第三课：发请求前，电脑先做了什么？</a><a href="web-cors.html">第四课：终端能访问，网页为什么报错？</a><a href="web-session.html">第五课：登录一次，为什么能记住我？</a><a href="web-server.html">第六课：页面、接口和数据库，放在哪里？</a><p>已有知识</p><a href="mysql.html">MySQL 实战</a><a href="java-deeper.html">Java 基础</a></aside><main><article><section><div class="eyebrow">12 / 从终端任务清单走向网页</div><h1>第六课：页面、接口和数据库，放在哪里？</h1><p class="lead">现在我们把前面的零件放回一张图里，看看用户点开网站后，请求究竟走到哪里。</p></section><pre><code>浏览器
+  ↓ https://todo.example
+Nginx
+  ├── /             → 网页、样式、脚本等文件
+  └── /api/...      → Java 应用 → TaskDao → MySQL</code></pre><h2>1. 为什么有些内容可以直接发文件？</h2><p>HTML、CSS、JavaScript 和图片可以作为静态资源发送。服务器读取对应文件，返回给浏览器即可。浏览器拿到 JavaScript 后执行，才会进一步请求任务接口。静态表示服务端在这一步通常不用根据每次任务数据生成文件；页面本身仍然可以通过脚本交互。</p><p>任务列表则随用户和数据库内容变化，需要 Java 处理请求、检查身份、查询数据，再生成响应。所以静态文件服务和业务接口处理可以由不同程序承担。</p><h2>2. Nginx 为什么能放在前面？</h2><p>Nginx 可以提供静态文件，也可以接收浏览器请求后转发给后面的 Java 服务，再把响应交回浏览器。后者叫反向代理。浏览器只面对 todo.example，内部 Java 程序可以运行在本机 8081。</p><p>这样可以集中处理网站入口、HTTPS 证书和静态文件，让 Java 负责业务。把网页与 /api 放在同一来源下，也减少了前端直接面对跨源接口的情况。Nginx 根据项目规模选择，最初的本地练习不必立刻安装。</p><h2>3. 看一份小配置，读懂请求会去哪</h2><p>下面是 nginx.conf 的独立最小示意。实际文件位置取决于安装方式；/absolute/path/to/site 要替换成网页目录，8081 要替换成 Java 应用端口。这里只演示 HTTP，正式 HTTPS 还需要证书与 TLS 配置。</p><pre><code>events {}
+http {
+    include mime.types;
+    server {
+        listen 8088;
+        server_name localhost;
+        root /absolute/path/to/site;
+        index index.html;
+
+        location /api/ {
+            proxy_pass http://127.0.0.1:8081;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location / {
+            try_files $uri $uri/ =404;
+        }
+    }
+}</code></pre><p>访问 /index.html，从 root 对应目录找文件。访问 /api/tasks，转发给 8081，并保留 /api/tasks 路径。注意 proxy_pass 这里没有末尾的斜杠；如果写成 http://127.0.0.1:8081/，匹配的 /api/ 前缀通常会被替换，后端会收到 /tasks，可能因此出现 404。</p><p>转发头让后端知道外部请求信息，但后端只能信任自己配置的代理提供的这些头。安装 Nginx 后，可以先用 nginx -t 检查语法，再按实际安装方式加载配置。语法通过还需要验证文件存在、端口可达、请求路径正确。</p><h2>4. Java 是怎样接到 HTTP 请求的？</h2><p>前面的观察实验使用 JDK 自带 HttpServer，它负责监听端口和解析请求。实际 Java Web 项目也常使用 Tomcat。Tomcat 实现 Servlet 规范，帮助应用接收请求、构造响应并管理处理组件。</p><p>Servlet 可以理解成放在 Web 容器里的请求处理组件。应用通常通过路由把请求交给某个处理方法，容器负责调用它。现代框架会帮你包装很多细节，但底下仍要有人监听端口、解析请求、安排处理。</p><h2>5. Servlet 从创建到结束，会经历什么？</h2><pre><code>容器创建实例 → init 初始化 → 多次 service 处理请求 → destroy 清理</code></pre><p>init 通常在实例初始化时执行一次，可以准备共享资源。service 在请求到来时执行，HttpServlet 会按方法再分到 doGet、doPost 等处理方法。destroy 在容器移除组件等生命周期结束时执行，释放相关资源；进程突然被杀死时不能依赖一定执行到它。</p><p>一个 Servlet 实例可能被多个请求并发使用。因此不要把“当前用户”“当前任务”放进会被请求之间共享的实例字段，再在处理时不断修改。请求自己的临时数据应放在局部变量或相应请求上下文中。</p><h2>6. Tomcat 的连接器、容器和线程各负责什么？</h2><p>连接器负责网络入口和协议处理，把字节转换成可处理的请求。容器管理 Web 应用和 Servlet，按路径分发请求。执行请求的线程负责运行处理代码；常见配置会使用工作线程池。</p><p>连接数量不等于正在执行的线程数量。现代连接器可以用非阻塞网络 I/O 管理许多连接，处理业务时再安排执行线程。若请求在等慢查询，工作线程可能长时间被占住；线程池、数据库连接池和查询性能就会共同影响吞吐。具体线程模型随 Tomcat 配置及是否使用异步或虚拟线程等而变化。</p><h2>7. 回到你的任务清单，下一次要改哪里？</h2><p>现在不必立刻把缓存、JWT、Nginx 一次全部加上。真正把程序改成网页服务时，可以先接一条 GET /api/tasks：HTTP 处理方法调用已有 TaskDao 查询，把结果转成 JSON，再返回给浏览器。前端负责把这份 JSON 显示成列表。</p><p>这一次迁移，替换的是 Scanner 输入和 println 输出所在的交互部分。你已经写好的数据库查询仍然能复用。确认列表显示后，再按接口约定接入新增、修改和删除。</p><div class="exercise"><strong>先想一想</strong><p>TaskDao 应该决定网页按钮的颜色吗？网页应该直接拼 SQL 吗？</p><details><summary>展开解释</summary><p>两者各有职责。前端决定显示与交互；后端检查请求和权限，组织业务；TaskDao 负责数据访问。接口约定让这些部分可以配合。</p></details></div><p>继续查阅：<a href="https://nginx.org/en/docs/beginners_guide.html">Nginx 入门</a> · <a href="https://tomcat.apache.org/tomcat-11.0-doc/architecture/overview.html">Tomcat 架构</a> · <a href="https://tomcat.apache.org/tomcat-11.0-doc/servletapi/jakarta/servlet/http/HttpServlet.html">Servlet 方法与生命周期</a></p><footer><a href="web-session.html">← 上一篇</a> · </footer></article></main></div></body></html>
