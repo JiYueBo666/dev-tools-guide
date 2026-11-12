@@ -1,0 +1,31 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>从一个 Java 文件，走到 Maven 项目 | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">后续：Spring Boot</a></header><div class="layout"><aside><div class="side-title">先把 Maven 项目看明白</div><a href="maven.html">从一个 Java 文件，走到 Maven 项目</a><a href="maven-dependencies.html">项目要用 Gson，Maven 怎样把它接进来</a><a href="maven-build.html">编译、测试、打包，最后怎样跑起来</a><p>接着学习</p><a href="framework-start.html">从空文件夹写 Web 接口</a></aside><main><article><div class="eyebrow">SPRING BOOT 之前 / MAVEN</div><h1>从一个 Java 文件，走到 Maven 项目</h1><p class="lead">先暂停 Spring Boot。我们把“一个项目怎样被编译和运行”这件事从头讲清楚。</p><p>你最初只有一个 Todo.java。写完后，交给 javac 编译，再用 java 运行。这条路已经熟悉，Maven 就从这里接着往下做。</p><p>后来你要用 Gson，于是多了别人写好的类。又要接 MySQL，再加一个驱动。程序开始有好几个文件，还需要测试、配置和打包。如果每次都自己列出源文件、寻找外部库、拼运行命令，这些重复工作就会越来越多。</p><p>Maven 可以替你安排这段过程。你在项目里放一份 pom.xml，写清项目身份、需要哪些工具，以及特殊的构建设置；其余目录按约定摆好。以后告诉 Maven“编译”或“打包”，它就按这份说明和约定去做。</p><h2>Maven 项目没有换一种 Java</h2><p>同样的 class、main、import 都照常使用。“Maven 项目”说的是文件怎样组织、怎样描述依赖，以及怎样安排构建。Java 代码仍然交给 Java 编译器处理。</p><p>这一篇先不用 Spring Boot，也不使用 Gson。我们自己建一个只有 main 的小项目，看 Maven 到哪里找文件，编译后又把结果放在哪里。后两篇再讲依赖和打包：<a href="maven-dependencies.html">给项目加 Gson</a>、<a href="maven-build.html">从编译到运行，读懂 Maven 命令</a>。</p><h2>给 Maven 一张说明书，也给代码一个位置</h2><p>你已经装好了 Maven，可以继续使用。另建练习目录，保留原项目：</p><pre><code>mkdir -p ~/code/maven-notes/src/main/java/com/example/notes
+cd ~/code/maven-notes</code></pre><p>这里最外层的 maven-notes 是项目根目录。以后 pom.xml 放在这一层，运行 Maven 命令通常也在这一层。</p><p>src 表示源文件；main 表示正式程序；java 表示 Java 源码。Maven 默认从 src/main/java 往下找代码。这像双方提前约定把资料放在同一个柜子里：你按约定放，它就不必每次问文件在哪。目录可以自定义，初学时先沿用约定，少增加一项要解释的配置。</p><p>后面的 com/example/notes 对应包名 com.example.notes。包给类分类并避免重名。它与 pom.xml 中项目的 groupId 经常写得相近，但二者并没有必须完全一致的规则。</p><h2>先写你熟悉的 main</h2><p>用 VS Code 打开 maven-notes 整个文件夹，在 src/main/java/com/example/notes/Hello.java 写入：</p><pre><code>package com.example.notes;
+
+public class Hello {
+    public static void main(String[] args) {
+        System.out.println(&quot;这是我自己建的 Maven 项目&quot;);
+    }
+}</code></pre><p>文件名是 Hello.java，公开类也叫 Hello。第一行说明类属于 com.example.notes，main 从这里开始执行。到目前为止，你仍然只写了普通 Java。</p><h2>pom.xml 里面写什么</h2><p>在项目根目录创建 pom.xml，和 src 并排。先给你完整的一份，再逐块说它的来历。这里只声明当前程序需要的构建设置，没有业务外部库：</p><pre><code>&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot;
+         xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+         xsi:schemaLocation=&quot;http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd&quot;&gt;
+    &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+    &lt;groupId&gt;com.example&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-notes&lt;/artifactId&gt;
+    &lt;version&gt;1.0-SNAPSHOT&lt;/version&gt;
+    &lt;properties&gt;
+        &lt;maven.compiler.release&gt;21&lt;/maven.compiler.release&gt;
+        &lt;project.build.sourceEncoding&gt;UTF-8&lt;/project.build.sourceEncoding&gt;
+    &lt;/properties&gt;
+    &lt;build&gt;
+        &lt;plugins&gt;
+            &lt;plugin&gt;
+                &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+                &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
+                &lt;version&gt;3.14.1&lt;/version&gt;
+            &lt;/plugin&gt;
+        &lt;/plugins&gt;
+    &lt;/build&gt;
+&lt;/project&gt;</code></pre><p>先看 XML 的形状。<code>&lt;project&gt;</code> 打开一个范围，<code>&lt;/project&gt;</code> 结束它；里面还可以有小范围。比如 properties 里面是属性，build/plugins 里面是构建插件。缩进帮助人看清归属，真正表达层级的是成对标签。<code>&lt;!-- 说明 --&gt;</code> 可以写注释。</p><p>最上面 project 的网址说明 XML 命名空间和结构约定，它们不是你的接口地址，也不是运行 Java 时要访问的网站。先保留这段固定写法。modelVersion 4.0.0 描述 POM 模型格式，也不是你安装的 Maven 版本。</p><p>接下来三项给项目起身份：groupId 可以表示组织或项目组，artifactId 是这个产物的名字，version 是版本。这里合起来表示 com.example 这一组中的 maven-notes，版本为 1.0-SNAPSHOT。SNAPSHOT 通常表示仍在开发变化的版本，先认识含义即可。</p><p>properties 中，maven.compiler.release 21 让编译器按 Java 21 的语言、字节码和平台 API 约束编译，需要使用支持这个目标的 JDK。project.build.sourceEncoding 让工具按 UTF-8 读取源文件，中文就有明确的编码约定。</p><p>最后的 compiler 插件负责调用 Java 编译器。这里把版本写清，减少不同 Maven 默认插件版本带来的差异。现在先把它理解成“Maven 做编译这件事时使用的工具”，下一篇会把它与 Gson 这种依赖分开讲。</p><h2>看它到底把文件搬到了哪里</h2><p>此时目录是：</p><pre><code>maven-notes/
+├── pom.xml
+└── src/main/java/com/example/notes/Hello.java</code></pre><p>在含 pom.xml 的目录运行：</p><pre><code>mvn compile</code></pre><p>Maven 先读取项目说明，准备构建所需工具，再从 src/main/java 编译源文件。第一次可能出现 Downloading，下载的也可能是编译等构建工具，不代表你已经给业务代码加了 Gson。</p><p>看到 BUILD SUCCESS 后，看看 target/classes/com/example/notes，应该有 Hello.class。src 放你写的东西，target 放这次构建生成的东西；这两个位置分开，重新构建就不会覆盖源码。</p><h2>main 还是交给 java 启动</h2><p>在项目根目录执行：</p><pre><code>java -cp target/classes com.example.notes.Hello</code></pre><p>-cp 告诉 Java 到哪里查类。这里是 target/classes，后面写完整类名 com.example.notes.Hello。因为我们加了 package，运行时也要带上包名。终端应输出“这是我自己建的 Maven 项目”。</p><p>这条路径现在很清楚：你写 Hello.java，Maven 调用编译工具生成 Hello.class，Java 找到这个类并执行 main。Maven 并没有替代 Java 的运行环境。</p><h2>以后出现更多文件，应该放在哪里</h2><p>正式程序继续放 src/main/java，程序要随包带走的配置等资源放 src/main/resources。自动检查程序的测试代码放 src/test/java，测试专用资源放 src/test/resources。构建后的正式类在 target/classes，测试类在 target/test-classes。</p><p>resources 中的文件通常会复制进运行时类路径。以后从资源中读配置，可以通过类路径读取；不能假定打包后电脑上还存在原来的 src/main/resources 目录。程序运行中产生的用户上传与数据库数据，也不适合当作源码资源写回这里。</p><p>target 通常不提交到 Git，因为可以根据源文件再生成。pom.xml 与 src 应保留，它们让另一台装好相应工具的电脑重新构建项目。</p><p>先读到这里，你只需要能指出四个位置：项目说明放哪里，源代码放哪里，编译结果放哪里，启动时 Java 从哪里找类。后面再让它使用你熟悉的 Gson。</p><p>参考：<a href="https://maven.apache.org/guides/introduction/introduction-to-the-standard-directory-layout">标准目录</a>、<a href="https://maven.apache.org/guides/introduction/introduction-to-the-pom.html">POM 结构</a>。</p><footer><a href="maven-dependencies.html">下一篇 →</a></footer></article></main></div></body></html>

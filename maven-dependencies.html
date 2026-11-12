@@ -1,0 +1,22 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>项目要用 Gson，Maven 怎样把它接进来 | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">后续：Spring Boot</a></header><div class="layout"><aside><div class="side-title">先把 Maven 项目看明白</div><a href="maven.html">从一个 Java 文件，走到 Maven 项目</a><a href="maven-dependencies.html">项目要用 Gson，Maven 怎样把它接进来</a><a href="maven-build.html">编译、测试、打包，最后怎样跑起来</a><p>接着学习</p><a href="framework-start.html">从空文件夹写 Web 接口</a></aside><main><article><div class="eyebrow">SPRING BOOT 之前 / MAVEN</div><h1>项目要用 Gson，Maven 怎样把它接进来</h1><p class="lead">你已经能编译自己的类了。现在让这个小程序使用别人写好的类，看看新增的工作在哪里。</p><p>Hello 只用 Java 自带的输出功能，JDK 已经提供了它。想把任务变成 JSON，就要使用 Gson。Gson 也由许多 Java 类组成，只是这些类由别人编译和发布好了。</p><p>这些类常被装在一个 JAR 文件里。JAR 可以理解成按 Java 工具约定组织的归档文件，里面装着类和资源。要使用 Gson，编译和运行时都得能找到这份库。Maven 帮我们根据清单获取它，并在需要时准备依赖路径。</p><h2>先说明要哪个库</h2><p>回到上一篇的 pom.xml。在 properties 结束之后、build 开始之前，增加 dependencies：</p><pre><code>&lt;dependencies&gt;
+    &lt;dependency&gt;
+        &lt;groupId&gt;com.google.code.gson&lt;/groupId&gt;
+        &lt;artifactId&gt;gson&lt;/artifactId&gt;
+        &lt;version&gt;2.15.0&lt;/version&gt;
+    &lt;/dependency&gt;
+&lt;/dependencies&gt;</code></pre><p>Gson 的这组三项是它的发布身份。你自己的项目有一组身份，依赖也有一组；Maven 根据组、名字和版本找到对应产物。这些值从 <a href="https://github.com/google/gson">Gson 官方说明</a>查，不需要猜名字。</p><p>以后加 MySQL 驱动，就在同一个 dependencies 里面再添一段 dependency。项目仍只有这一份主 pom.xml，已有的 build 等部分保留。</p><h2>写 import 时，库还没凭空出现</h2><p>把 Hello.java 改成下面这个完整程序：</p><pre><code>package com.example.notes;
+
+import com.google.gson.Gson;
+import java.util.Map;
+
+public class Hello {
+    public static void main(String[] args) {
+        Gson gson = new Gson();
+        String json = gson.toJson(Map.of(&quot;content&quot;, &quot;喝水&quot;));
+        System.out.println(json);
+    }
+}</code></pre><p>import com.google.gson.Gson 让编译器知道 Gson 这个短名称指向哪个类。它不下载类，也不创建对象。pom.xml 中的依赖让 Maven 获取库，import 帮源码识别类名，new Gson() 才创建转换工具。这三处做的是同一条路上不同的工作。</p><p>java.util.Map 由 JDK 提供，不必增加外部依赖。Map.of 在这里创建一项键值对应关系，Gson 再把它写成 JSON。程序运行后应看到 {"content":"喝水"}。</p><h2>为什么只改依赖，还需要再编译</h2><p>执行 mvn compile，Maven 会把新依赖纳入编译路径，编译器才能识别 Gson。Maven 通常先查本地缓存，需要时再从配置的远程仓库下载。默认常用公共仓库是 Maven Central，第一次较慢，以后很多文件可以复用。</p><p>默认本地仓库在用户目录的 .m2/repository，例如 Gson 的 JAR 会按它的组、名字和版本排列。一般不需要手动进去复制和删除文件。</p><p>一个库自己也可能需要其他库。Maven 按发布者的依赖说明继续查找，这叫传递依赖。可以在项目根目录运行 mvn dependency:tree，查看当前项目最终使用哪些库，以及它们从哪条依赖关系进来。</p><h2>这次运行，为什么不能只用原来那条 java 命令</h2><p>上篇的 -cp target/classes 只指向你编译出的类。Gson 位于另一份 JAR 中，运行时也需要找到它。如果编译成功却运行时报 NoClassDefFoundError，可能就是运行时类路径缺了外部库。</p><p>可以让 Maven 的执行插件帮忙准备项目依赖后启动 main。先在 build/plugins 中，放到已有 compiler 插件之后，增加：</p><pre><code>&lt;plugin&gt;
+    &lt;groupId&gt;org.codehaus.mojo&lt;/groupId&gt;
+    &lt;artifactId&gt;exec-maven-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.5.0&lt;/version&gt;
+&lt;/plugin&gt;</code></pre><p>然后在根目录运行：</p><pre><code>mvn compile exec:java -Dexec.mainClass=com.example.notes.Hello</code></pre><p>compile 先编译，exec:java 再调用执行插件，-Dexec.mainClass 指定入口类。这里执行插件负责准备运行环境，它没有被写进你的业务代码里。后面的 Spring Boot 插件也承担类似的构建与启动辅助工作，只是会准备 Web 应用需要的环境。</p><h2>依赖和插件，放在不同位置是有原因的</h2><p>Gson 是程序运行时要调用的工具，所以写在 dependencies。compiler 和 exec 由 Maven 在构建或执行阶段使用，所以放在 build/plugins。看一段配置时，可以先问：是业务代码要用它，还是 Maven 要用它来办事？</p><p>还有一些库只在特定阶段需要。scope 为 test 的测试库参与测试编译和测试运行，通常不进入正式应用的运行依赖；runtime 常用于源码没有直接引用具体类、但运行时需要的实现，比如某些数据库驱动。没有写 scope 的普通依赖默认是 compile 范围。</p><h2>换版本和排错，也要看清是哪一层</h2><p>库的版本冲突时，Maven 会按依赖规则选择最终版本，不能只看你在一处写了什么。dependency:tree 能帮助检查，最终选择也可能受依赖管理影响。先看清问题，再决定是否统一版本或排除某条传递依赖。</p><p>如果 IDE 提示找不到 com.google，先看 mvn compile 能否通过。Maven 通过而编辑器仍报红，可能是 IDE 没有导入整个 Maven 项目；确认打开的是含 pom.xml 的根目录。若 Maven 本身也下载失败，则看网络、仓库与报错的依赖坐标。两种情况需要处理的位置不同。</p><p>参考：<a href="https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html">依赖机制</a>、<a href="https://www.mojohaus.org/exec-maven-plugin/usage.html">执行 Java 程序的插件</a>。</p><footer><a href="maven.html">← 上一篇</a> · <a href="maven-build.html">下一篇 →</a></footer></article></main></div></body></html>
