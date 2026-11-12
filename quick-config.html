@@ -1,0 +1,16 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>5. 配置与日志 | 工程速通</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="quick.html">工程速通入口</a></header><div class="layout"><aside><div class="side-title">按用法完成工程</div><a href="quick.html">Spring Boot 工程速通</a><a href="quick-start.html">1. 建工程并启动</a><a href="quick-crud.html">2. 接通任务接口</a><a href="quick-input.html">3. 输入、错误和上传</a><a href="quick-chain.html">4. 公共请求处理</a><a href="quick-config.html">5. 配置与日志</a><a href="quick-mysql.html">6. 切换到 MySQL</a><a href="quick-orm.html">7. ORM 常见问题，按这几条处理</a><a href="quick-test.html">8. 测试与日常操作速查</a></aside><main><article><div class="eyebrow">SPRING BOOT / 工程速通</div><h1>5. 配置与日志</h1><p class="lead">只记住改哪里，不需要重写配置加载代码。</p><div class="table-wrap"><table><tr><th>你要改什么</th><th>启动时写什么</th></tr><tr><td>端口</td><td>PORT=8093 mvn spring-boot:run</td></tr><tr><td>访问密钥</td><td>APP_API_KEY=新密钥 mvn spring-boot:run</td></tr><tr><td>网页来源</td><td>WEB_ORIGIN=http://127.0.0.1:5173 mvn spring-boot:run</td></tr><tr><td>上传目录</td><td>UPLOAD_DIR=/绝对路径/attachments mvn spring-boot:run</td></tr><tr><td>每秒请求上限</td><td>REQUESTS_PER_SECOND=10 mvn spring-boot:run</td></tr></table></div><p>这些名字在 application.yaml 的 ${变量名:默认值} 中声明。YAML 放默认配置，环境变量传本次环境的值。密码不提交到 Git。Spring Boot 默认不会自动读取任意 .env 文件；本教程直接在启动命令前传值。</p><h2>记录一条业务日志</h2><pre><code>// 放在需要记录日志的类中：
+private static final org.slf4j.Logger log =
+    org.slf4j.LoggerFactory.getLogger(TaskService.class);
+
+// 放在方法里，值由自己的业务变量提供：
+log.info(&quot;task_created id={}&quot;, taskId);
+log.warn(&quot;task_rejected reason={}&quot;, reason);
+log.error(&quot;task_save_failed&quot;, exception);</code></pre><p>这里只展示日志片段，不要把尚未声明的 taskId、reason、exception 直接复制进方法。把值换成当前代码里已有的变量。INFO 写关键正常事件，WARN 写需要关注的问题，ERROR 写失败；排查细节用 DEBUG。不要记录密码、密钥或完整私有正文。</p><h2>调级别、切成结构化输出</h2><pre><code># 只在开发排查时，增加 application.yaml 中这一项：
+logging:
+  level:
+    com.example.quick: DEBUG
+
+# 想输出 JSON 日志时，在同一个 logging 下增加：
+  structured:
+    format:
+      console: logstash</code></pre><p>上面是同一 logging 配置下的片段，应合并进原配置，不要建立两个 logging 顶层键。结构化输出时不再依赖原来的文本 pattern。requestId 会随日志上下文输出；先用它找到同一次请求。跨多个服务的 traceId 需要接入链路追踪组件及传播配置，不能仅靠复制一个随机字段完成。</p><p>固定排查方法：浏览器或 curl 记下 X-Request-ID；在终端日志里找同一个编号；看 status 和 durationMs，再看具体错误。</p><footer><a href="quick-chain.html">← 上一节</a> · <a href="quick-mysql.html">下一节 →</a></footer></article></main></div></body></html>

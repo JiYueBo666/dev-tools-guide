@@ -1,0 +1,126 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>2. 接通任务接口 | 工程速通</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="quick.html">工程速通入口</a></header><div class="layout"><aside><div class="side-title">按用法完成工程</div><a href="quick.html">Spring Boot 工程速通</a><a href="quick-start.html">1. 建工程并启动</a><a href="quick-crud.html">2. 接通任务接口</a><a href="quick-input.html">3. 输入、错误和上传</a><a href="quick-chain.html">4. 公共请求处理</a><a href="quick-config.html">5. 配置与日志</a><a href="quick-mysql.html">6. 切换到 MySQL</a><a href="quick-orm.html">7. ORM 常见问题，按这几条处理</a><a href="quick-test.html">8. 测试与日常操作速查</a></aside><main><article><div class="eyebrow">SPRING BOOT / 工程速通</div><h1>2. 接通任务接口</h1><p class="lead">这一节新增四个文件。四个都保存后，再重启服务。</p><p>目录固定为 src/main/java/com/example/quick。Controller 接请求，Service 办业务，Repository 访问数据库，Entity 对应表。以后主要改 Controller 和 Service。</p><h2>TaskEntity.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/TaskEntity.java</code></p><p><strong>怎么用：</strong>固定保留 Entity、Id、编号生成和无参数构造方法。要新增字段，再修改这里及对应请求/响应字段。表名使用 quick_tasks，避免与旧项目的 tasks 混淆。</p><pre><code>package com.example.quick;
+import jakarta.persistence.*;
+@Entity
+@Table(name=&quot;quick_tasks&quot;)
+public class TaskEntity {
+    @Id @GeneratedValue(strategy=GenerationType.IDENTITY)
+    private Long id;
+    @Column(nullable=false, length=200)
+    private String content;
+    private boolean done;
+    private boolean deleted;
+    protected TaskEntity() {}
+    public TaskEntity(String content) { this.content = content; }
+    public Long getId() { return id; }
+    public String getContent() { return content; }
+    public boolean isDone() { return done; }
+    public boolean isDeleted() { return deleted; }
+    public void setDone(boolean done) { this.done = done; }
+    public void markDeleted() { deleted = true; }
+}</code></pre><h2>TaskRepository.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/TaskRepository.java</code></p><p><strong>怎么用：</strong>基础增删改查从 JpaRepository 继承。按条件查询的方法写在这里，方法名中的字段必须与实体字段一致。</p><pre><code>package com.example.quick;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+public interface TaskRepository extends JpaRepository&lt;TaskEntity, Long&gt; {
+    Page&lt;TaskEntity&gt; findByDeletedFalse(Pageable pageable);
+    Page&lt;TaskEntity&gt; findByDeletedFalseAndDone(boolean done, Pageable pageable);
+    Optional&lt;TaskEntity&gt; findByIdAndDeletedFalse(long id);
+}</code></pre><h2>TaskService.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/TaskService.java</code></p><p><strong>怎么用：</strong>保留事务注解、构造方法和 required。改业务规则时主要修改各方法内部；TaskView 是接口输出，TaskPage 是分页输出。</p><pre><code>package com.example.quick;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import java.util.List;
+@Service
+public class TaskService {
+    public record TaskView(long id, String content, boolean done) {
+        static TaskView of(TaskEntity t) { return new TaskView(t.getId(), t.getContent(), t.isDone()); }
+    }
+    public record TaskPage(List&lt;TaskView&gt; items, long total, int page, int size) {}
+    public static class Missing extends RuntimeException {}
+    private final TaskRepository repository;
+    public TaskService(TaskRepository repository) { this.repository = repository; }
+    @Transactional
+    public TaskView create(String content) { return TaskView.of(repository.save(new TaskEntity(content.strip()))); }
+    @Transactional(readOnly=true)
+    public TaskView find(long id) { return TaskView.of(required(id)); }
+    @Transactional(readOnly=true)
+    public TaskPage list(int page, int size, Boolean done) {
+        // 对外页码从 1 开始，排序字段固定，避免直接接受任意列名。
+        var request = PageRequest.of(page - 1, size, Sort.by(&quot;id&quot;).descending());
+        var result = done == null ? repository.findByDeletedFalse(request)
+                : repository.findByDeletedFalseAndDone(done, request);
+        return new TaskPage(result.map(TaskView::of).getContent(), result.getTotalElements(), page, size);
+    }
+    @Transactional
+    public TaskView changeDone(long id, boolean done) {
+        var task = required(id);
+        task.setDone(done); // false 也会写回；方法成功返回后提交事务。
+        return TaskView.of(task);
+    }
+    @Transactional
+    public void delete(long id) { required(id).markDeleted(); }
+    @Transactional
+    public List&lt;TaskView&gt; importTasks(List&lt;String&gt; contents) {
+        var entities = contents.stream().map(String::strip).map(TaskEntity::new).toList();
+        return repository.saveAll(entities).stream().map(TaskView::of).toList();
+    }
+    private TaskEntity required(long id) {
+        return repository.findByIdAndDeletedFalse(id).orElseThrow(Missing::new);
+    }
+}</code></pre><h2>TaskController.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/TaskController.java</code></p><p><strong>怎么用：</strong>类上的 /api/tasks 是共同前缀。方法上的路径是子路径。路径变量用 @PathVariable；问号后的参数用 @RequestParam；JSON 正文用 @RequestBody；要校验时加 @Valid。</p><pre><code>package com.example.quick;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import java.net.URI;
+import java.util.List;
+@RestController
+@RequestMapping(&quot;/api/tasks&quot;)
+public class TaskController {
+    public record Create(@NotBlank @Size(max=200) String content) {}
+    public record Change(@NotNull Boolean done) {}
+    public record Import(@NotEmpty @Size(max=100) List&lt;@NotBlank @Size(max=200) String&gt; contents) {}
+    private final TaskService service;
+    public TaskController(TaskService service) { this.service = service; }
+    @PostMapping
+    public ResponseEntity&lt;TaskService.TaskView&gt; create(@Valid @RequestBody Create input) {
+        var result = service.create(input.content());
+        return ResponseEntity.created(URI.create(&quot;/api/tasks/&quot; + result.id())).body(result);
+    }
+    @GetMapping(&quot;/{id}&quot;)
+    public TaskService.TaskView find(@PathVariable @Positive long id) { return service.find(id); }
+    @GetMapping
+    public TaskService.TaskPage list(@RequestParam(defaultValue=&quot;1&quot;) @Min(1) int page,
+            @RequestParam(defaultValue=&quot;20&quot;) @Min(1) @Max(100) int size,
+            @RequestParam(required=false) Boolean done) {
+        return service.list(page, size, done);
+    }
+    @PatchMapping(&quot;/{id}&quot;)
+    public TaskService.TaskView change(@PathVariable @Positive long id, @Valid @RequestBody Change input) {
+        return service.changeDone(id, input.done());
+    }
+    @DeleteMapping(&quot;/{id}&quot;)
+    public ResponseEntity&lt;Void&gt; delete(@PathVariable @Positive long id) {
+        service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+    @PostMapping(&quot;/imports&quot;)
+    public List&lt;TaskService.TaskView&gt; importTasks(@Valid @RequestBody Import input) {
+        return service.importTasks(input.contents());
+    }
+}</code></pre><h2>按顺序验证成功路径</h2><pre><code># 新建任务：预期 201，记录响应中的 id
+curl -i http://127.0.0.1:8092/api/tasks   -H &#x27;X-API-Key: local-practice-key&#x27;   -H &#x27;Content-Type: application/json&#x27; -d &#x27;{&quot;content&quot;:&quot;学习框架&quot;}&#x27;
+
+# 假设刚才返回 id=1；如果不是，替换成真实编号
+curl -i http://127.0.0.1:8092/api/tasks/1 -H &#x27;X-API-Key: local-practice-key&#x27;
+
+# 翻页、筛选：预期 200，含 items 和 total
+curl -i &#x27;http://127.0.0.1:8092/api/tasks?page=1&amp;size=20&amp;done=false&#x27;   -H &#x27;X-API-Key: local-practice-key&#x27;
+
+# 修改状态：预期 done=true
+curl -i -X PATCH http://127.0.0.1:8092/api/tasks/1   -H &#x27;X-API-Key: local-practice-key&#x27;   -H &#x27;Content-Type: application/json&#x27; -d &#x27;{&quot;done&quot;:true}&#x27;
+
+# 删除：预期 204，无正文
+curl -i -X DELETE http://127.0.0.1:8092/api/tasks/1   -H &#x27;X-API-Key: local-practice-key&#x27;</code></pre><p>错误输出在下一节统一；当前先完成以上正常路径。默认数据库是内存库，每次重启从空表开始。</p><h2>以后按哪几行套用</h2><div class="table-wrap"><table><tr><th>目的</th><th>固定写法</th></tr><tr><td>接口分组</td><td>类上 @RequestMapping("/api/资源名")</td></tr><tr><td>取路径编号</td><td>@GetMapping("/{id}") + @PathVariable long id</td></tr><tr><td>取筛选参数</td><td>@RequestParam(required=false) Boolean done</td></tr><tr><td>取 JSON</td><td>@Valid @RequestBody 请求类型 input</td></tr><tr><td>注入服务</td><td>private final 服务类型 service + 构造方法接收</td></tr><tr><td>查不到任务</td><td>required(id) 抛 Missing，交下一节统一处理</td></tr></table></div><footer><a href="quick-start.html">← 上一节</a> · <a href="quick-input.html">下一节 →</a></footer></article></main></div></body></html>

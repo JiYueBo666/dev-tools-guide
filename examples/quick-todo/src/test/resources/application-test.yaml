@@ -1,0 +1,12 @@
+app:
+  api-key: test-key
+  upload-dir: ${java.io.tmpdir}/quick-todo-test-files
+  requests-per-second: 1000
+spring:
+  datasource:
+    url: jdbc:h2:mem:quicktodo_test;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop

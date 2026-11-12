@@ -1,0 +1,22 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>6. 切换到 MySQL | 工程速通</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="quick.html">工程速通入口</a></header><div class="layout"><aside><div class="side-title">按用法完成工程</div><a href="quick.html">Spring Boot 工程速通</a><a href="quick-start.html">1. 建工程并启动</a><a href="quick-crud.html">2. 接通任务接口</a><a href="quick-input.html">3. 输入、错误和上传</a><a href="quick-chain.html">4. 公共请求处理</a><a href="quick-config.html">5. 配置与日志</a><a href="quick-mysql.html">6. 切换到 MySQL</a><a href="quick-orm.html">7. ORM 常见问题，按这几条处理</a><a href="quick-test.html">8. 测试与日常操作速查</a></aside><main><article><div class="eyebrow">SPRING BOOT / 工程速通</div><h1>6. 切换到 MySQL</h1><p class="lead">前面的接口不用改。只增加一个数据库配置文件，建立专用库，再换启动方式。</p><h2>建立独立练习库</h2><p>启动已有 MySQL 容器。使用管理员进入 mysql 客户端后执行下面 SQL。它只创建这一节专用的库、表与账号，不要把库名改成旧任务库。MySQL 容器仍按前面的 Docker 文档运行。</p><pre><code>CREATE DATABASE IF NOT EXISTS todo_quick_lab CHARACTER SET utf8mb4;
+CREATE USER IF NOT EXISTS &#x27;quick_app&#x27;@&#x27;%&#x27; IDENTIFIED BY &#x27;quick_lab_password&#x27;;
+GRANT SELECT, INSERT, UPDATE, DELETE ON todo_quick_lab.* TO &#x27;quick_app&#x27;@&#x27;%&#x27;;
+USE todo_quick_lab;
+CREATE TABLE IF NOT EXISTS quick_tasks (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  content VARCHAR(200) NOT NULL,
+  done BOOLEAN NOT NULL DEFAULT FALSE,
+  deleted BOOLEAN NOT NULL DEFAULT FALSE
+);</code></pre><p>密码是本机练习值。若 quick_app 账号已经存在，CREATE USER IF NOT EXISTS 不会重设它的密码，启动时要用该账号实际密码。应用账号只拿这个库的数据读写权限，建表由上面的管理员完成。</p><h2>application-mysql.yaml</h2><p><strong>文件：</strong><code>src/main/resources/application-mysql.yaml</code></p><p><strong>怎么用：</strong>这是新增文件，不替换原 application.yaml。保留 ddl-auto: validate。启用 mysql profile 后，它覆盖 H2 的数据源和建表策略。URL 中关闭 TLS 与获取公钥的组合仅用于当前本机 Docker 连接。远程连接需配置验证证书的 TLS。</p><pre><code>spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/todo_quick_lab?sslMode=DISABLED&amp;allowPublicKeyRetrieval=true}
+    username: ${DB_USER:quick_app}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 3000
+      max-lifetime: 1500000
+  jpa:
+    hibernate:
+      ddl-auto: validate</code></pre><h2>用 mysql 配置启动</h2><pre><code>DB_PASSWORD=quick_lab_password   mvn spring-boot:run -Dspring-boot.run.profiles=mysql</code></pre><p>若映射到本机 3307，额外传 DB_URL，写成你自己的 JDBC 地址。若用户名不同，再传 DB_USER。多个变量写在同一启动命令前。</p><h2>验证数据保留</h2><p>用第二节的 POST 创建一条任务，记住返回编号。停止 Java，再用上面的 mysql 命令重启，GET 同一编号应仍能查到。观察启动日志确认本次是 mysql profile；没有启用它时仍使用 H2，重启就会清空。</p><div class="table-wrap"><table><tr><th>连接池设置</th><th>这一轮固定值</th></tr><tr><td>maximum-pool-size</td><td>5</td></tr><tr><td>minimum-idle</td><td>1</td></tr><tr><td>connection-timeout</td><td>3000 毫秒</td></tr><tr><td>max-lifetime</td><td>1500000 毫秒</td></tr></table></div><p>先用这些小规模练习值，不要通过盲目加大连接数处理慢查询。连接数要按实例数累加，并受数据库能力限制。close 会把池化连接归还；连接被长事务占住时，其他请求仍会等。</p><p>遇到 Access denied，核对账号密码与授权；Unknown database 核对库名；validate 报缺表或字段不匹配，对照建表语句。不要为了让错误消失，把 ddl-auto 改成 create。</p><footer><a href="quick-config.html">← 上一节</a> · <a href="quick-orm.html">下一节 →</a></footer></article></main></div></body></html>

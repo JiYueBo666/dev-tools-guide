@@ -1,0 +1,59 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>1. 建工程并启动 | 工程速通</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="quick.html">工程速通入口</a></header><div class="layout"><aside><div class="side-title">按用法完成工程</div><a href="quick.html">Spring Boot 工程速通</a><a href="quick-start.html">1. 建工程并启动</a><a href="quick-crud.html">2. 接通任务接口</a><a href="quick-input.html">3. 输入、错误和上传</a><a href="quick-chain.html">4. 公共请求处理</a><a href="quick-config.html">5. 配置与日志</a><a href="quick-mysql.html">6. 切换到 MySQL</a><a href="quick-orm.html">7. ORM 常见问题，按这几条处理</a><a href="quick-test.html">8. 测试与日常操作速查</a></aside><main><article><div class="eyebrow">SPRING BOOT / 工程速通</div><h1>1. 建工程并启动</h1><p class="lead">先完成一个能访问的入口。下面的固定内容按原样写。</p><h2>建目录</h2><pre><code>mkdir -p ~/code/quick-todo/src/main/java/com/example/quick
+mkdir -p ~/code/quick-todo/src/main/resources
+cd ~/code/quick-todo</code></pre><p>在 VS Code 打开 quick-todo 整个文件夹。后面的终端命令都在这个含 pom.xml 的根目录运行。</p><h2>pom.xml</h2><p><strong>文件：</strong><code>pom.xml</code></p><p><strong>怎么用：</strong>固定使用下列依赖与版本。暂时只改 artifactId 时，后面的 JAR 文件名也要跟着改；第一轮保持 quick-todo。</p><pre><code>&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; xsi:schemaLocation=&quot;http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd&quot;&gt;
+  &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+  &lt;parent&gt;&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;&lt;artifactId&gt;spring-boot-starter-parent&lt;/artifactId&gt;&lt;version&gt;4.1.2&lt;/version&gt;&lt;relativePath/&gt;&lt;/parent&gt;
+  &lt;groupId&gt;com.example&lt;/groupId&gt;&lt;artifactId&gt;quick-todo&lt;/artifactId&gt;&lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;
+  &lt;properties&gt;&lt;java.version&gt;21&lt;/java.version&gt;&lt;/properties&gt;
+  &lt;dependencies&gt;
+    &lt;dependency&gt;&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;&lt;artifactId&gt;spring-boot-starter-webmvc&lt;/artifactId&gt;&lt;/dependency&gt;
+    &lt;dependency&gt;&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;&lt;artifactId&gt;spring-boot-starter-validation&lt;/artifactId&gt;&lt;/dependency&gt;
+    &lt;dependency&gt;&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;&lt;artifactId&gt;spring-boot-starter-webmvc-test&lt;/artifactId&gt;&lt;scope&gt;test&lt;/scope&gt;&lt;/dependency&gt;
+    &lt;dependency&gt;&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;&lt;artifactId&gt;spring-boot-starter-data-jpa&lt;/artifactId&gt;&lt;/dependency&gt;
+    &lt;dependency&gt;&lt;groupId&gt;com.h2database&lt;/groupId&gt;&lt;artifactId&gt;h2&lt;/artifactId&gt;&lt;scope&gt;runtime&lt;/scope&gt;&lt;/dependency&gt;
+    &lt;dependency&gt;&lt;groupId&gt;com.mysql&lt;/groupId&gt;&lt;artifactId&gt;mysql-connector-j&lt;/artifactId&gt;&lt;scope&gt;runtime&lt;/scope&gt;&lt;/dependency&gt;
+  &lt;/dependencies&gt;
+  &lt;build&gt;&lt;plugins&gt;&lt;plugin&gt;&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;&lt;artifactId&gt;spring-boot-maven-plugin&lt;/artifactId&gt;&lt;/plugin&gt;&lt;/plugins&gt;&lt;/build&gt;
+&lt;/project&gt;</code></pre><p>dependencies 里包含 Web、校验、JPA、H2、MySQL 驱动与测试工具。此时一次准备好依赖，后面不用反复改清单。</p><h2>application.yaml</h2><p><strong>文件：</strong><code>src/main/resources/application.yaml</code></p><p><strong>怎么用：</strong>照写。YAML 冒号后留空格，使用空格缩进。当前 datasource 使用 H2，create-drop 只用于这个内存练习库。</p><pre><code>server:
+  address: 127.0.0.1
+  port: ${PORT:8092}
+app:
+  api-key: ${APP_API_KEY:local-practice-key}
+  web-origin: ${WEB_ORIGIN:http://127.0.0.1:8080}
+  requests-per-second: ${REQUESTS_PER_SECOND:60}
+  upload-dir: ${UPLOAD_DIR:./uploads}
+spring:
+  datasource:
+    url: jdbc:h2:mem:quicktodo;DB_CLOSE_DELAY=-1
+    username: sa
+    password: &quot;&quot;
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+logging:
+  level:
+    root: INFO
+    com.example.quick: INFO
+  pattern:
+    console: &quot;%d{HH:mm:ss} %-5level [%X{requestId}] %logger{24} - %msg%n&quot;</code></pre><h2>QuickApplication.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/QuickApplication.java</code></p><p><strong>怎么用：</strong>这一阶段照写，不改类名和包名。</p><pre><code>package com.example.quick;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+@SpringBootApplication
+public class QuickApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(QuickApplication.class, args);
+    }
+}</code></pre><h2>HelloController.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/HelloController.java</code></p><p><strong>怎么用：</strong>保留 @RestController 和 @GetMapping。要改路径，只改 /hello；要改页面文字，只改 return 的字符串。</p><pre><code>package com.example.quick;
+import org.springframework.web.bind.annotation.*;
+@RestController
+public class HelloController {
+    @GetMapping(&quot;/hello&quot;)
+    public String hello() { return &quot;服务已启动&quot;; }
+}</code></pre><h2>运行并验证</h2><pre><code>mvn spring-boot:run
+# 保持服务运行，另开终端：
+curl -i http://127.0.0.1:8092/hello -H &#x27;X-API-Key: local-practice-key&#x27;</code></pre><p>预期：200，正文“服务已启动”。停止用 Control + C。修改 Java 或 YAML 后，先停止旧进程，再重新运行。若 8092 被占用，用 PORT=8093 mvn spring-boot:run，后续地址也改成 8093。</p><div class="note">固定运行命令：mvn spring-boot:run。启动失败先看终端里的第一条实际错误；不要只看最后一行 BUILD FAILURE。</div><footer><a href="quick.html">← 上一节</a> · <a href="quick-crud.html">下一节 →</a></footer></article></main></div></body></html>

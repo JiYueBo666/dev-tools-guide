@@ -1,0 +1,82 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>3. 输入、错误和上传 | 工程速通</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="quick.html">工程速通入口</a></header><div class="layout"><aside><div class="side-title">按用法完成工程</div><a href="quick.html">Spring Boot 工程速通</a><a href="quick-start.html">1. 建工程并启动</a><a href="quick-crud.html">2. 接通任务接口</a><a href="quick-input.html">3. 输入、错误和上传</a><a href="quick-chain.html">4. 公共请求处理</a><a href="quick-config.html">5. 配置与日志</a><a href="quick-mysql.html">6. 切换到 MySQL</a><a href="quick-orm.html">7. ORM 常见问题，按这几条处理</a><a href="quick-test.html">8. 测试与日常操作速查</a></aside><main><article><div class="eyebrow">SPRING BOOT / 工程速通</div><h1>3. 输入、错误和上传</h1><p class="lead">先统一失败回复，再接文件上传。下面新增三个文件。</p><h2>ApiError.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/ApiError.java</code></p><p><strong>怎么用：</strong>固定错误字段为 code、message、requestId。前端可以直接按 code 分支提示。</p><pre><code>package com.example.quick;
+public record ApiError(String code, String message, Object requestId) {}</code></pre><h2>ApiErrors.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/ApiErrors.java</code></p><p><strong>怎么用：</strong>固定保留已知 HTTP 错误分类和最后的 500 兜底。新增业务异常时，增加一个对应的 @ExceptionHandler 方法；修改 code 与提示，不把服务器堆栈返回给前端。</p><pre><code>package com.example.quick;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+@RestControllerAdvice
+public class ApiErrors {
+    private static final Logger log = LoggerFactory.getLogger(ApiErrors.class);
+    private ResponseEntity&lt;ApiError&gt; reply(int status, String code, String message, HttpServletRequest r) {
+        return ResponseEntity.status(status).body(new ApiError(code, message, r.getAttribute(&quot;requestId&quot;)));
+    }
+    @ExceptionHandler(TaskService.Missing.class)
+    public ResponseEntity&lt;ApiError&gt; missing(HttpServletRequest r) {
+        return reply(404, &quot;TASK_NOT_FOUND&quot;, &quot;没有找到任务&quot;, r);
+    }
+    @ExceptionHandler({MethodArgumentNotValidException.class, HandlerMethodValidationException.class,
+        MethodArgumentTypeMismatchException.class, HttpMessageNotReadableException.class, IllegalArgumentException.class})
+    public ResponseEntity&lt;ApiError&gt; invalid(HttpServletRequest r) {
+        return reply(400, &quot;INVALID_INPUT&quot;, &quot;请检查字段、格式和取值范围&quot;, r);
+    }
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity&lt;ApiError&gt; large(HttpServletRequest r) { return reply(413, &quot;FILE_TOO_LARGE&quot;, &quot;文件过大&quot;, r); }
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity&lt;ApiError&gt; media(HttpServletRequest r) { return reply(415, &quot;WRONG_CONTENT_TYPE&quot;, &quot;请求类型不支持&quot;, r); }
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity&lt;ApiError&gt; method(org.springframework.web.HttpRequestMethodNotSupportedException e, HttpServletRequest r) {
+        return ResponseEntity.status(405).allow(e.getSupportedHttpMethods().toArray(org.springframework.http.HttpMethod[]::new))
+            .body(new ApiError(&quot;METHOD_NOT_ALLOWED&quot;, &quot;请求方法不支持&quot;, r.getAttribute(&quot;requestId&quot;)));
+    }
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity&lt;ApiError&gt; route(HttpServletRequest r) { return reply(404, &quot;ROUTE_NOT_FOUND&quot;, &quot;地址不存在&quot;, r); }
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;ApiError&gt; unexpected(Exception e, HttpServletRequest r) {
+        log.error(&quot;request failed&quot;, e);
+        return reply(500, &quot;INTERNAL_ERROR&quot;, &quot;操作失败，请稍后重试&quot;, r);
+    }
+}</code></pre><h2>给请求字段加校验的写法</h2><pre><code>public record Create(@NotBlank @Size(max=200) String content) {}
+public record Change(@NotNull Boolean done) {}
+
+// 方法参数上必须保留 @Valid：
+public TaskService.TaskView change(
+        @PathVariable @Positive long id,
+        @Valid @RequestBody Change input) {
+    return service.changeDone(id, input.done());
+}</code></pre><p>上面是已有 TaskController 的片段，不要重复粘贴成第二份方法。常用规则：必填文字 @NotBlank，必须存在 @NotNull，长度 @Size，数值下限 @Min，正数 @Positive。done 用 Boolean，才能区分“漏填”和“明确传 false”。</p><h2>UploadController.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/UploadController.java</code></p><p><strong>怎么用：</strong>文件名和方法可照写。保存目录由配置控制。只返回服务端生成的 fileId，不按用户原文件名保存，也不提供自动下载/执行入口。</p><pre><code>package com.example.quick;
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+@RestController
+@RequestMapping(&quot;/api/files&quot;)
+public class UploadController {
+    private final Path root;
+    public UploadController(@Value(&quot;${app.upload-dir}&quot;) String dir) { root = Path.of(dir).toAbsolutePath(); }
+    @PostMapping
+    public ResponseEntity&lt;Map&lt;String, String&gt;&gt; upload(@RequestParam(&quot;file&quot;) MultipartFile file) throws IOException {
+        if (file.isEmpty()) throw new IllegalArgumentException(&quot;空文件&quot;);
+        Files.createDirectories(root);
+        String id = UUID.randomUUID().toString();
+        try (var input = file.getInputStream()) { Files.copy(input, root.resolve(id)); }
+        return ResponseEntity.status(201).body(Map.of(&quot;fileId&quot;, id));
+    }
+}</code></pre><h2>验证错误与上传</h2><pre><code># 空内容：预期 400、INVALID_INPUT
+curl -i http://127.0.0.1:8092/api/tasks   -H &#x27;X-API-Key: local-practice-key&#x27;   -H &#x27;Content-Type: application/json&#x27; -d &#x27;{&quot;content&quot;:&quot; &quot;}&#x27;
+
+# 查不存在的任务：预期 404、TASK_NOT_FOUND
+curl -i http://127.0.0.1:8092/api/tasks/999999 -H &#x27;X-API-Key: local-practice-key&#x27;
+
+# 创建一个练习文件，再上传：预期 201、fileId
+printf &#x27;练习附件
+&#x27; &gt; attachment.txt
+curl -i http://127.0.0.1:8092/api/files   -H &#x27;X-API-Key: local-practice-key&#x27; -F &#x27;file=@attachment.txt&#x27;</code></pre><p>上传文件保存在 ./uploads。配置已限制单文件 2MB、总请求 3MB；空文件返回 400，超限返回 413。这里用于保存附件；要把文件当图片展示或公开下载时，还要增加内容类型检查、权限与安全响应。</p><p>成功结构固定：创建/查询/修改直接返回 TaskView；列表返回 {items,total,page,size}；删除返回 204。失败统一返回 ApiError。不要只为个别接口随意加一层 {data:...}。requestId 在下一节接上，之前可以为 null。</p><footer><a href="quick-crud.html">← 上一节</a> · <a href="quick-chain.html">下一节 →</a></footer></article></main></div></body></html>

@@ -1,0 +1,27 @@
+server:
+  address: 127.0.0.1
+  port: ${PORT:8092}
+app:
+  api-key: ${APP_API_KEY:local-practice-key}
+  web-origin: ${WEB_ORIGIN:http://127.0.0.1:8080}
+  requests-per-second: ${REQUESTS_PER_SECOND:60}
+  upload-dir: ${UPLOAD_DIR:./uploads}
+spring:
+  datasource:
+    url: jdbc:h2:mem:quicktodo;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+logging:
+  level:
+    root: INFO
+    com.example.quick: INFO
+  pattern:
+    console: "%d{HH:mm:ss} %-5level [%X{requestId}] %logger{24} - %msg%n"

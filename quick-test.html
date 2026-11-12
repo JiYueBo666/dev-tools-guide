@@ -1,0 +1,105 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>8. 测试与日常操作速查 | 工程速通</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="quick.html">工程速通入口</a></header><div class="layout"><aside><div class="side-title">按用法完成工程</div><a href="quick.html">Spring Boot 工程速通</a><a href="quick-start.html">1. 建工程并启动</a><a href="quick-crud.html">2. 接通任务接口</a><a href="quick-input.html">3. 输入、错误和上传</a><a href="quick-chain.html">4. 公共请求处理</a><a href="quick-config.html">5. 配置与日志</a><a href="quick-mysql.html">6. 切换到 MySQL</a><a href="quick-orm.html">7. ORM 常见问题，按这几条处理</a><a href="quick-test.html">8. 测试与日常操作速查</a></aside><main><article><div class="eyebrow">SPRING BOOT / 工程速通</div><h1>8. 测试与日常操作速查</h1><p class="lead">把最后两个文件写好，以后改完接口就运行 mvn test。</p><p>测试不使用 MySQL profile，而使用独立 H2 测试库。它只负责检查代码行为；MySQL 的方言、锁和约束仍需专用 MySQL 集成测试。</p><h2>application-test.yaml</h2><p><strong>文件：</strong><code>src/test/resources/application-test.yaml</code></p><p><strong>怎么用：</strong>固定放在 test/resources，不是 main/resources。测试注解 @ActiveProfiles("test") 启用它。</p><pre><code>app:
+  api-key: test-key
+  upload-dir: ${java.io.tmpdir}/quick-todo-test-files
+  requests-per-second: 1000
+spring:
+  datasource:
+    url: jdbc:h2:mem:quicktodo_test;DB_CLOSE_DELAY=-1
+    username: sa
+    password: &quot;&quot;
+  jpa:
+    hibernate:
+      ddl-auto: create-drop</code></pre><h2>TaskApiTest.java</h2><p><strong>文件：</strong><code>src/test/java/com/example/quick/TaskApiTest.java</code></p><p><strong>怎么用：</strong>固定保留测试 profile。要新增用例，在这个类里增加测试方法；预期结果按接口约定写。测试每次清空的 repository 仅对应测试库。</p><pre><code>package com.example.quick;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.MediaType;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+@SpringBootTest @AutoConfigureMockMvc @ActiveProfiles(&quot;test&quot;)
+class TaskApiTest {
+    @Autowired MockMvc mvc;
+    @Autowired TaskRepository repository;
+    @Autowired TaskService service;
+    @BeforeEach void clear() { repository.deleteAll(); }
+    @Test void crudAndFalseAndSoftDelete() throws Exception {
+        String location = mvc.perform(post(&quot;/api/tasks&quot;).header(&quot;X-API-Key&quot;,&quot;test-key&quot;)
+            .contentType(MediaType.APPLICATION_JSON).content(&quot;{\&quot;content\&quot;:\&quot;练习\&quot;}&quot;))
+            .andExpect(status().isCreated()).andReturn().getResponse().getHeader(&quot;Location&quot;);
+        mvc.perform(patch(location).header(&quot;X-API-Key&quot;,&quot;test-key&quot;).contentType(MediaType.APPLICATION_JSON)
+            .content(&quot;{\&quot;done\&quot;:true}&quot;)).andExpect(status().isOk()).andExpect(jsonPath(&quot;$.done&quot;).value(true));
+        mvc.perform(patch(location).header(&quot;X-API-Key&quot;,&quot;test-key&quot;).contentType(MediaType.APPLICATION_JSON)
+            .content(&quot;{\&quot;done\&quot;:false}&quot;)).andExpect(status().isOk()).andExpect(jsonPath(&quot;$.done&quot;).value(false));
+        mvc.perform(get(&quot;/api/tasks?done=false&amp;page=1&amp;size=1&quot;).header(&quot;X-API-Key&quot;,&quot;test-key&quot;))
+            .andExpect(status().isOk()).andExpect(jsonPath(&quot;$.total&quot;).value(1));
+        mvc.perform(delete(location).header(&quot;X-API-Key&quot;,&quot;test-key&quot;)).andExpect(status().isNoContent());
+        mvc.perform(get(location).header(&quot;X-API-Key&quot;,&quot;test-key&quot;)).andExpect(status().isNotFound());
+        Assertions.assertEquals(1,repository.count());
+        Assertions.assertTrue(repository.findAll().getFirst().isDeleted());
+    }
+    @ParameterizedTest @ValueSource(strings={&quot;{}&quot;,&quot;{\&quot;content\&quot;:\&quot; \&quot;}&quot;,&quot;bad-json&quot;})
+    void validatesInput(String input) throws Exception {
+        mvc.perform(post(&quot;/api/tasks&quot;).header(&quot;X-API-Key&quot;,&quot;test-key&quot;).contentType(MediaType.APPLICATION_JSON)
+            .content(input)).andExpect(status().isBadRequest()).andExpect(jsonPath(&quot;$.requestId&quot;).isNotEmpty());
+    }
+    @Test void auth() throws Exception { mvc.perform(get(&quot;/api/tasks&quot;)).andExpect(status().isUnauthorized()); }
+    @Test void badPage() throws Exception {
+        mvc.perform(get(&quot;/api/tasks?page=0&quot;).header(&quot;X-API-Key&quot;,&quot;test-key&quot;)).andExpect(status().isBadRequest());
+    }
+    @Test void corsPreflight() throws Exception {
+        mvc.perform(options(&quot;/api/tasks&quot;).header(&quot;Origin&quot;,&quot;http://127.0.0.1:8080&quot;)
+            .header(&quot;Access-Control-Request-Method&quot;,&quot;POST&quot;).header(&quot;Access-Control-Request-Headers&quot;,&quot;X-API-Key,Content-Type&quot;))
+            .andExpect(status().isOk()).andExpect(header().string(&quot;Access-Control-Allow-Origin&quot;,&quot;http://127.0.0.1:8080&quot;));
+    }
+    @Test void imports() throws Exception {
+        mvc.perform(post(&quot;/api/tasks/imports&quot;).header(&quot;X-API-Key&quot;,&quot;test-key&quot;).contentType(MediaType.APPLICATION_JSON)
+            .content(&quot;{\&quot;contents\&quot;:[\&quot;任务甲\&quot;,\&quot;任务乙\&quot;]}&quot;)).andExpect(status().isOk());
+        Assertions.assertEquals(2,repository.count());
+    }
+    @Test void rollsBackWholeImport() {
+        Assertions.assertThrows(RuntimeException.class,
+            () -&gt; service.importTasks(java.util.List.of(&quot;先写入&quot;, &quot;x&quot;.repeat(201))));
+        Assertions.assertEquals(0, repository.count());
+    }
+    @Test void uploadsAndRejectsEmptyFile() throws Exception {
+        var file = new org.springframework.mock.web.MockMultipartFile(&quot;file&quot;, &quot;a.txt&quot;, &quot;text/plain&quot;, &quot;hello&quot;.getBytes());
+        var result = mvc.perform(multipart(&quot;/api/files&quot;).file(file).header(&quot;X-API-Key&quot;,&quot;test-key&quot;))
+            .andExpect(status().isCreated()).andReturn();
+        String json = result.getResponse().getContentAsString();
+        // 固定响应只有 fileId，可直接提取 UUID；不依赖字段顺序解析其他数据。
+        String id = java.util.regex.Pattern.compile(&quot;[0-9a-f]{8}-[0-9a-f-]{27,}&quot;).matcher(json).results().findFirst().orElseThrow().group();
+        var path = java.nio.file.Path.of(System.getProperty(&quot;java.io.tmpdir&quot;), &quot;quick-todo-test-files&quot;, id);
+        try { Assertions.assertEquals(&quot;hello&quot;, java.nio.file.Files.readString(path)); }
+        finally { java.nio.file.Files.deleteIfExists(path); }
+        mvc.perform(multipart(&quot;/api/files&quot;).file(new org.springframework.mock.web.MockMultipartFile(&quot;file&quot;, new byte[0]))
+            .header(&quot;X-API-Key&quot;,&quot;test-key&quot;)).andExpect(status().isBadRequest());
+    }
+    @Test void fixedWindowLimiterRejectsSecondRequest() throws Exception {
+        var filter = new RequestFilter(&quot;test-key&quot;, 1);
+        java.util.function.Supplier&lt;org.springframework.mock.web.MockHttpServletRequest&gt; request = () -&gt; {
+            var r = new org.springframework.mock.web.MockHttpServletRequest(&quot;GET&quot;, &quot;/api/tasks&quot;);
+            r.addHeader(&quot;X-API-Key&quot;, &quot;test-key&quot;); return r;
+        };
+        // 同一窗口内的两次请求；若正好跨秒则重新执行一组。
+        boolean rejected = false;
+        for (int i = 0; i &lt; 3 &amp;&amp; !rejected; i++) {
+            filter.doFilter(request.get(), new org.springframework.mock.web.MockHttpServletResponse(), (a,b) -&gt; {});
+            var response = new org.springframework.mock.web.MockHttpServletResponse();
+            filter.doFilter(request.get(), response, (a,b) -&gt; {});
+            rejected = response.getStatus() == 429;
+        }
+        Assertions.assertTrue(rejected);
+    }
+}</code></pre><h2>运行</h2><pre><code>mvn test
+mvn package
+java -jar target/quick-todo-0.0.1-SNAPSHOT.jar</code></pre><p>mvn test 全通过应显示 BUILD SUCCESS。package 构建可执行包；最后一条启动默认 H2。启动包时切 MySQL，使用 DB_PASSWORD=实际密码 java -jar target/quick-todo-0.0.1-SNAPSHOT.jar --spring.profiles.active=mysql。</p><p>参数化测试把同一条输入规则交给多种数据检查：缺字段、空白、坏 JSON 都返回 400。这对应图片中的表格驱动测试。不要只测正常输入。</p><h2>新接口固定按这个顺序加</h2><div class="table-wrap"><table><tr><th>位置</th><th>做什么</th></tr><tr><td>TaskController</td><td>写 @GetMapping/@PostMapping 等，声明参数与校验</td></tr><tr><td>请求 record</td><td>只放本接口允许接收的字段</td></tr><tr><td>TaskService</td><td>写业务方法；需要数据库一致性时标事务</td></tr><tr><td>TaskRepository</td><td>需要新查询时增加方法或明确 SQL/JPQL</td></tr><tr><td>响应 record</td><td>只返回前端需要的字段</td></tr><tr><td>ApiErrors</td><td>有新业务失败类型时增加错误码映射</td></tr><tr><td>TaskApiTest</td><td>检查成功、输入错误、找不到资源、权限等行为</td></tr></table></div><h2>复制接口时，只改这些位置</h2><pre><code>// 例如，新增一个按编号读取的接口：
+@GetMapping(&quot;/{id}&quot;)                       // 改子路径
+public TaskService.TaskView find(
+        @PathVariable @Positive long id) { // 路径参数名对应 {id}
+    return service.find(id);               // 改成对应业务方法
+}</code></pre><p>这是已有代码的对照，不要再粘贴出第二个相同路由。需要新功能时，给它新的方法或路径，并写对应 Service。统一错误、日志和请求编号通常无需再写一遍。</p><h2>测试数据库隔离固定要求</h2><p>保持 test profile 使用独立库。若要改为真实 MySQL 测试，使用一次性 Testcontainers 容器或单独测试库账号，先确认不会连入日常数据。不要依赖测试方法上的回滚去清理真实 HTTP 服务线程提交的数据，异步和 REQUIRES_NEW 事务也要单独处理。</p><p>这轮用法到这里已覆盖路由、绑定校验、上传、响应、公共链、配置、日志、数据库、ORM 和测试。后面开发一个新资源，可以照这些文件分工复制，再改名字、字段与业务方法。</p><footer><a href="quick-orm.html">← 上一节</a> · </footer></article></main></div></body></html>

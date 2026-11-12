@@ -1,0 +1,84 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>4. 公共请求处理 | 工程速通</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="quick.html">工程速通入口</a></header><div class="layout"><aside><div class="side-title">按用法完成工程</div><a href="quick.html">Spring Boot 工程速通</a><a href="quick-start.html">1. 建工程并启动</a><a href="quick-crud.html">2. 接通任务接口</a><a href="quick-input.html">3. 输入、错误和上传</a><a href="quick-chain.html">4. 公共请求处理</a><a href="quick-config.html">5. 配置与日志</a><a href="quick-mysql.html">6. 切换到 MySQL</a><a href="quick-orm.html">7. ORM 常见问题，按这几条处理</a><a href="quick-test.html">8. 测试与日常操作速查</a></aside><main><article><div class="eyebrow">SPRING BOOT / 工程速通</div><h1>4. 公共请求处理</h1><p class="lead">把请求编号、日志、访问校验、跨域和限流集中放好。新增两个文件。</p><h2>RequestFilter.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/RequestFilter.java</code></p><p><strong>怎么用：</strong>第一轮整体照写。它先生成请求编号，放入 request 与 MDC，再检查密钥和限流，然后 chain.doFilter 继续处理；finally 记录耗时并清理 MDC。修改业务接口时不必改这个文件。</p><pre><code>package com.example.quick;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.UUID;
+import org.slf4j.*;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+@Component
+public class RequestFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(RequestFilter.class);
+    private final byte[] apiKey;
+    private final int perSecond;
+    private long window = System.currentTimeMillis() / 1000;
+    private int count;
+    public RequestFilter(@Value(&quot;${app.api-key}&quot;) String key, @Value(&quot;${app.requests-per-second:60}&quot;) int limit) {
+        if (key.isBlank() || limit &lt; 1) throw new IllegalArgumentException(&quot;配置不能为空或小于1&quot;);
+        this.apiKey = key.getBytes(StandardCharsets.UTF_8);
+        this.perSecond = limit;
+    }
+    // 单进程全局固定窗口；多人/多实例项目需要换成合适的限流组件。
+    private synchronized boolean allow() {
+        long now = System.currentTimeMillis() / 1000;
+        if (now != window) { window = now; count = 0; }
+        return ++count &lt;= perSecond;
+    }
+    private void fail(HttpServletResponse r, int status, String code, String message, String id) throws IOException {
+        r.setStatus(status);
+        r.setContentType(&quot;application/json&quot;);
+        r.setCharacterEncoding(&quot;UTF-8&quot;);
+        // 参数只取下方固定字符串与服务端生成的 UUID。
+        r.getWriter().write(&quot;{\&quot;code\&quot;:\&quot;&quot; + code + &quot;\&quot;,\&quot;message\&quot;:\&quot;&quot; + message + &quot;\&quot;,\&quot;requestId\&quot;:\&quot;&quot; + id + &quot;\&quot;}&quot;);
+    }
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+        String id = UUID.randomUUID().toString();
+        request.setAttribute(&quot;requestId&quot;, id);
+        response.setHeader(&quot;X-Request-ID&quot;, id);
+        MDC.put(&quot;requestId&quot;, id);
+        long start = System.nanoTime();
+        try {
+            if (request.getMethod().equals(&quot;OPTIONS&quot;)) { chain.doFilter(request, response); return; }
+            String supplied = request.getHeader(&quot;X-API-Key&quot;);
+            if (supplied == null || !MessageDigest.isEqual(apiKey, supplied.getBytes(StandardCharsets.UTF_8))) {
+                fail(response, 401, &quot;UNAUTHORIZED&quot;, &quot;缺少有效凭证&quot;, id); return;
+            }
+            if (!allow()) {
+                response.setHeader(&quot;Retry-After&quot;, &quot;1&quot;);
+                fail(response, 429, &quot;RATE_LIMITED&quot;, &quot;请求太快，请稍后再试&quot;, id); return;
+            }
+            chain.doFilter(request, response);
+        } finally {
+            log.info(&quot;method={} path={} status={} durationMs={}&quot;, request.getMethod(), request.getRequestURI(),
+                response.getStatus(), (System.nanoTime() - start)/1_000_000);
+            MDC.remove(&quot;requestId&quot;);
+        }
+    }
+}</code></pre><div class="note">这里的鉴权是单密钥入口校验，用于本机工程练习。它不区分不同用户，也不提供用户权限、JWT 或 Session 登录。多人项目请接 Spring Security，并在 Service 中验证任务归属。</div><h2>WebConfig.java</h2><p><strong>文件：</strong><code>src/main/java/com/example/quick/WebConfig.java</code></p><p><strong>怎么用：</strong>允许的网页来源从 app.web-origin 读取。新增 HTTP 方法或自定义头时，修改对应清单。这里没有启用跨源 Cookie。</p><pre><code>package com.example.quick;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.*;
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    private final String origin;
+    public WebConfig(@Value(&quot;${app.web-origin}&quot;) String origin) { this.origin = origin; }
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping(&quot;/api/**&quot;).allowedOrigins(origin)
+                .allowedMethods(&quot;GET&quot;, &quot;POST&quot;, &quot;PATCH&quot;, &quot;DELETE&quot;, &quot;OPTIONS&quot;)
+                .allowedHeaders(&quot;Content-Type&quot;, &quot;X-API-Key&quot;).exposedHeaders(&quot;X-Request-ID&quot;);
+    }
+}</code></pre><h2>重启后验证</h2><pre><code># 不带密钥：预期 401
+curl -i http://127.0.0.1:8092/api/tasks
+
+# 带正确密钥：预期 200，响应带 X-Request-ID
+curl -i http://127.0.0.1:8092/api/tasks -H &#x27;X-API-Key: local-practice-key&#x27;
+
+# 模拟浏览器预检：预期允许 8080 来源
+curl -i -X OPTIONS http://127.0.0.1:8092/api/tasks   -H &#x27;Origin: http://127.0.0.1:8080&#x27;   -H &#x27;Access-Control-Request-Method: POST&#x27;   -H &#x27;Access-Control-Request-Headers: X-API-Key,Content-Type&#x27;</code></pre><h2>改密钥、来源和限额的固定位置</h2><pre><code># 先停止旧服务；下次启动时使用新值
+APP_API_KEY=my-local-key WEB_ORIGIN=http://127.0.0.1:5173   REQUESTS_PER_SECOND=10 mvn spring-boot:run</code></pre><p>此后请求头改成 X-API-Key: my-local-key。当前限流是单进程全局固定窗口，每秒最多指定次数，超出返回 429 和 Retry-After: 1。多用户或多实例项目不要沿用这个全局计数；需要按用户等维度采用适合的共享限流组件。</p><p>下游要取本次请求编号，固定用 request.getAttribute("requestId")。日志自动取 MDC。不要把当前用户放进单例控制器字段，也不要假定新开的异步线程自动拥有这个上下文。</p><footer><a href="quick-input.html">← 上一节</a> · <a href="quick-config.html">下一节 →</a></footer></article></main></div></body></html>
