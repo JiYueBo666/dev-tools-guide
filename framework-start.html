@@ -1,4 +1,67 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>网页敲门，谁来接待？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="maven.html">先读：Maven 项目入门</a><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="note">如果目录和 pom.xml 还不熟悉，先读 <a href="maven.html">Maven 项目入门</a>，从普通 main 开始理解，再回来写 Web 接口。</div><div class="eyebrow">13 / SPRING BOOT</div><h1>从空文件夹写出第一个接口</h1><p>我们先让浏览器显示一句“你好，任务清单”。先不连接数据库，也不创建任务。只把一条请求怎样进入 Java 讲清楚。</p><h2>先给这个练习留一个地方</h2><p>在终端创建新目录。原来的 javacode 项目保留，后面需要接数据库时再对照它。</p><pre><code>mkdir -p ~/code/todo-web/src/main/java/com/example/todo
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>打开 /hello 后发生了什么？ | 开发工具入门</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a><a href="framework.html">Spring Boot 学习路线</a></header><div class="layout"><aside><div class="side-title">框架怎样帮助任务清单</div><a href="maven.html">先读：Maven 项目入门</a><a href="framework.html">让 Spring Boot 接手重复的工作</a><a href="framework-start.html">网页敲门，谁来接待？</a><a href="framework-input.html">收到的内容，怎样放心使用？</a><a href="framework-chain.html">每条请求都要做的事，放在哪里？</a><a href="framework-project.html">功能多了，代码怎样安放？</a><a href="framework-data.html">把内存里的任务交给数据库</a><a href="framework-orm.html">代码变短以后，数据库还在做什么？</a><a href="framework-tests.html">改完代码，怎样知道旧功能还好？</a><p>前面的内容</p><a href="web.html">HTTP 与网页</a><a href="code-guide.html">读懂已有代码</a></aside><main><article><div class="eyebrow">先看懂你已经运行的程序</div>
+<h1>打开 /hello 以后，到底发生了什么？</h1>
+<p class="lead">你现在不用继续写代码。把运行着的程序想成一台已经开门营业的小机器，我们一起看它怎样接到一次请求，又怎样把文字送回来。</p>
+<p>你写过终端程序：运行 main，遇到 Scanner 就等待键盘输入，输入后继续执行，最后把文字打印到终端。现在我们仍然有 main，只是输入从键盘换成了浏览器，输出也要送回浏览器。为了接收这些网络消息，程序里多了一套 Web 服务工具。</p>
+<h2>先把刚才做的事接成一条线</h2>
+<p>你在终端启动 Java 程序，它开始等待请求。接着，你在浏览器输入地址。浏览器把请求送到这台电脑的 8090 端口。程序收到后找到 hello 方法，执行它，拿到返回的文字，最后把文字发回浏览器。</p>
+<div class="flow">浏览器访问 /hello<br>↓<br>8090 端口上的 Web 服务收到请求<br>↓<br>Spring 找到 HelloController 的 hello 方法<br>↓<br>方法返回“你好，任务清单”<br>↓<br>Web 服务把文字放进 HTTP 响应<br>↓<br>浏览器显示文字</div>
+<p>先记住这条线。下面讲的配置、注解和类，都要放回这条线上，看看它们帮了哪一段忙。</p>
+<h2>为什么写好了 HelloController，还要有 main？</h2>
+<p>只在文件里写下一个方法，Java 不会自动执行它。你原来的程序也是从 main 进入，再由 main 调用其他方法。这一次，入口仍然在 TodoApplication.java：</p>
+<pre><code>public static void main(String[] args) {
+    SpringApplication.run(TodoApplication.class, args);
+}</code></pre>
+<p>main 开始执行后，调用 SpringApplication.run。这是 Spring Boot 提供的方法，你通过 Maven 加入的依赖里有它。这个调用会开始准备应用：读取配置、寻找组件、安排对象，启动内置的 Web 服务器。</p>
+<p>TodoApplication.class 把“哪个类是这次应用的配置起点”交给 Spring。这里的 .class 表示取得这个类的描述对象，不是在写一个硬盘文件名。args 则继续传入启动程序时收到的命令行参数。</p>
+<p>服务启动后，进程继续运行，等待之后到来的网络请求。hello 方法此时还不需要执行。等浏览器真正来访问，再由请求处理过程调用它。所以你启动时没有看到“你好，任务清单”，访问网页时才看到它。</p>
+<h2>地址里的每一段，把请求送到了哪里？</h2>
+<pre><code>http://127.0.0.1:8090/hello</code></pre>
+<p>http 说明按 HTTP 方式交谈；127.0.0.1 指你当前这台电脑；8090 指这台电脑上接收请求的端口；/hello 告诉服务，这次想访问哪个路径。</p>
+<p>可以把主机地址和端口想成先找到一栋楼及其中的接待处，再把 /hello 交给接待处选择具体服务。端口帮助网络消息找到正在接收它的程序，路径帮助这个程序分辨要处理什么。</p>
+<p>因此，程序没启动，接待处还没开，就连接不上。程序在 8080 等待，你却去 8090，也连接不上。若已经找到服务，只是没有 /hello 这条路径，才可能得到 404。这些情况发生在不同位置。</p>
+<p>你之前的 YAML 写成 port:8090，缺少冒号后的空格，端口设置没有按预期生效，程序用了默认的 8080。这正好说明：写进配置的内容，要被正确读取，才会影响正在运行的服务。</p>
+<h2>Spring 怎么知道 /hello 对应哪个方法？</h2>
+<p>回到 HelloController.java。先看完整的主要部分：</p>
+<pre><code>@RestController
+public class HelloController {
+    @GetMapping("/hello")
+    public String hello() {
+        return "你好，任务清单";
+    }
+}</code></pre>
+<p>hello 是方法名。/hello 是网络路径。它们恰好用了同一个词，但本来可以不同。真正把请求路径和方法连起来的是 @GetMapping("/hello")，它写明“GET 请求访问 /hello 时，调用下面这个方法”。</p>
+<p>例如，把方法名 hello 改成 saySomething，保留 @GetMapping("/hello")，浏览器仍然访问 /hello。反过来，只把标记里的路径改成 /welcome，网络入口就变成 /welcome。这样就能分清方法名和网址路径各由谁决定。</p>
+<p>这些以 @ 开头的写法叫注解。这里可以先把它理解成附在代码上的说明，Spring 会读取说明并据此安排工作。@RestController 告诉它，这个类参与 Web 请求处理，方法返回值要作为响应内容交出去；@GetMapping 进一步给出方法与路径的对应关系。</p>
+<p>启动时，Spring 会建立请求与处理方法的对应关系。请求来到以后，就可以按方法和路径找到处理代码。你没有在 main 里手写 hello()，是因为调用的时机交给了 Web 请求处理过程。</p>
+<h2>那么，谁去发现这个类，又是谁创建它？</h2>
+<p>TodoApplication 上还有一个 @SpringBootApplication。它让这里成为启动配置的一部分，并启用组件扫描等安排。默认情况下，Spring 会从这个类所在的包向下查找合适的组件。</p>
+<p>你的 TodoApplication 和 HelloController 都写着 package com.example.todo，所以 HelloController 在扫描范围内。Spring 识别到它是控制器，会准备相应对象。后面收到 /hello 请求，就在这个对象上执行方法。</p>
+<p>这就是你没有写 new HelloController()，方法仍能被调用的原因：对象由框架管理了。框架能这样做，是因为你提供了启动入口、扫描范围和控制器标记，而不是单凭文件名猜用途。</p>
+<p>import 的工作更早。它帮助 Java 编译器认出 SpringApplication、RestController 等短名称分别指哪个类。实际的类由 Maven 依赖提供，注解表达框架要读取的安排，启动时 Spring 再根据这些安排组织对象。这几件事分工不同，但都在同一条过程中。</p>
+<h2>return 后面的文字，怎么跑到了浏览器？</h2>
+<p>在普通 Java 方法里，return 把值交给调用者。这里也一样。hello 把字符串交还给调用它的 Spring MVC 请求处理过程。因为这个类使用 @RestController，框架把返回值交给合适的消息转换器，写到 HTTP 响应正文中。</p>
+<p>对于这段字符串，浏览器拿到的就是一份文字响应，再把正文显示到页面上。如果你在方法里写 System.out.println，文字会出现在运行 Java 的终端；想让浏览器拿到文字，需要返回给框架，由框架写响应。</p>
+<p>因此，“网页上出现文字”并不是 Java 方法直接操作了浏览器窗口。中间还有一份 HTTP 响应。浏览器收到它以后，才负责显示。这一层边界后面会继续帮我们理解 JSON 和页面渲染。</p>
+<h2>再回看几个文件，就能知道各自为何存在</h2>
+<p>pom.xml 让 Maven 知道需要 Spring Web 这一组工具。Maven 负责准备编译、启动所需的库。它不负责接收浏览器的每一次请求。</p>
+<p>application.yaml 告诉应用使用 8090 端口。启动时读到配置，Web 服务才知道在哪里接待。main 发起启动，HelloController 则说明请求进来后由哪个方法处理。启动准备和请求处理，是先后发生的两段过程。</p>
+<pre><code>启动时：
+Maven 准备依赖与运行环境
+    → Java 执行 main
+    → Spring 读取配置、发现控制器、安排对象
+    → Web 服务开始等待请求
+
+每次访问时：
+浏览器发送 GET /hello
+    → Web 服务接收
+    → Spring 调用 hello
+    → 返回文字 → HTTP 响应 → 浏览器显示</code></pre>
+<p>从这些文件回头看，你已经亲手完成了最小的 Web 应用：有启动入口，有接收请求的端口，有地址到方法的对应关系，也有一份回复。</p>
+<h2>后半页的任务列表，只是在这条线上多加一站</h2>
+<p>hello 方法可以直接返回固定文字。查询任务则需要去拿数据，所以控制器先调用 TaskService，再把得到的列表返回。构造方法接收的 service，就是它需要合作的对象。Spring 会先准备服务对象，再交给控制器。</p>
+<p>你之后写到的 List、筛选和编号处理，仍然是普通 Java 代码。新的地方在外侧：由 HTTP 请求触发方法，再由框架整理响应。这一阶段 TaskService 只把任务留在内存里，尚未调用你的 MySQL。</p>
+<p>你现在的项目中已有 /hello 这条路径，就先把这条路径理解透。页面后面的任务代码可以等需要扩展时再读，不必为了看懂一次浏览器访问，同时记住并发容器和 Stream 的写法。</p>
+<details class="lesson-reference"><summary>展开原来的搭建步骤与完整代码</summary><div class="note">如果目录和 pom.xml 还不熟悉，先读 <a href="maven.html">Maven 项目入门</a>，从普通 main 开始理解，再回来写 Web 接口。</div><div class="eyebrow">13 / SPRING BOOT</div><h1>从空文件夹写出第一个接口</h1><p>我们先让浏览器显示一句“你好，任务清单”。先不连接数据库，也不创建任务。只把一条请求怎样进入 Java 讲清楚。</p><h2>先给这个练习留一个地方</h2><p>在终端创建新目录。原来的 javacode 项目保留，后面需要接数据库时再对照它。</p><pre><code>mkdir -p ~/code/todo-web/src/main/java/com/example/todo
 mkdir -p ~/code/todo-web/src/main/resources
 cd ~/code/todo-web</code></pre><p>src/main/java 是 Maven 查找 Java 源码的目录。后面的 com/example/todo 对应我们要写的包名 com.example.todo。src/main/resources 放应用读取的配置等资源。现在这些文件夹还是空的。</p><h2>告诉 Maven：这个程序需要接收 HTTP</h2><p>在 todo-web 根目录创建 pom.xml。你已经见过项目的 groupId、artifactId 和 version，这一次主要增加 parent、Web 依赖和运行插件。完整内容如下：</p><pre><code>&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot;
          xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
@@ -116,4 +179,4 @@ public class TaskController {
     public TaskService.Task find(@PathVariable long id) {
         return service.find(id);
     }
-}</code></pre><p>类上的 /api/tasks 给这组接口共同前缀。没有子路径的 @GetMapping 查列表；/{id} 把 /api/tasks/3 中的 3 交给 long id；@RequestParam 则读取 ?onlyOpen=true。路径说明操作哪条任务，查询参数补充筛选条件。构造方法把 TaskService 交进来，这段装配会在工程化一篇继续解释。</p><p>每次改完先停止旧进程，再运行 mvn spring-boot:run。访问 /api/tasks 会看到 []，因为此时还没有接收新增请求。下一篇就在这个自己写好的工程上接 POST，不需要另外取一份项目。</p><footer><a href="framework.html">← 上一篇</a> · <a href="framework-input.html">下一篇 →</a></footer></article></main></div></body></html>
+}</code></pre><p>类上的 /api/tasks 给这组接口共同前缀。没有子路径的 @GetMapping 查列表；/{id} 把 /api/tasks/3 中的 3 交给 long id；@RequestParam 则读取 ?onlyOpen=true。路径说明操作哪条任务，查询参数补充筛选条件。构造方法把 TaskService 交进来，这段装配会在工程化一篇继续解释。</p><p>每次改完先停止旧进程，再运行 mvn spring-boot:run。访问 /api/tasks 会看到 []，因为此时还没有接收新增请求。下一篇就在这个自己写好的工程上接 POST，不需要另外取一份项目。</p></details><footer><a href="framework.html">← 上一篇</a> · <a href="framework-input.html">下一篇 →</a></footer></article></main></div></body></html>
