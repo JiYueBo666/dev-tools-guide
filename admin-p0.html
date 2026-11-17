@@ -7,4 +7,21 @@
     // 把收到的数据放进盒子。
     result.data = data;
     return result;
-}</code></pre><p><code>public</code> 允许其他类调用；<code>static</code> 表示可以通过 <code>Result.success(...)</code> 调用，不必先在外面创建盒子。方法名前的 <code>&lt;T&gt;</code> 让这个静态方法自己声明数据类型；<code>Result&lt;T&gt;</code> 是返回类型，<code>T data</code> 是接收的数据，<code>return</code> 把装好的盒子交回调用者。</p><p>例如调用 <code>Result.success("登录成功")</code>，得到的 data 是文字。后续接口返回给前端时，会看到 code、msg、data 三个字段。我们下一步再把 LoginHandler 接上它。</p><div class="note"><strong>阅读进度：</strong>这一段只是在 Result 中新增方法。登录接口暂时不会自动改变；需要后续显式调用它。登录响应应选择安全字段，不能把密码哈希返回给前端。</div><footer><a href="index.html">返回教程首页</a></footer></article></main></div></body></html>
+}</code></pre><p><code>public</code> 允许其他类调用；<code>static</code> 表示可以通过 <code>Result.success(...)</code> 调用，不必先在外面创建盒子。方法名前的 <code>&lt;T&gt;</code> 让这个静态方法自己声明数据类型；<code>Result&lt;T&gt;</code> 是返回类型，<code>T data</code> 是接收的数据，<code>return</code> 把装好的盒子交回调用者。</p><p>例如调用 <code>Result.success("登录成功")</code>，得到的 data 是文字。后续接口返回给前端时，会看到 code、msg、data 三个字段。我们下一步再把 LoginHandler 接上它。</p><div class="note"><strong>阅读进度：</strong>这一段只是在 Result 中新增方法。登录接口暂时不会自动改变；需要后续显式调用它。登录响应应选择安全字段，不能把密码哈希返回给前端。</div><h2>下一步：登录接口用上结果盒子</h2><p>登录流程仍然从 Postman 进入 LoginHandler，AuthService 查询并验证用户。验证通过后，LoginHandler 把安全字段放进 data，再用 Result.success 打包回复。</p><div class="flow">Postman → LoginHandler → AuthService → Repository → MySQL<br>Postman ← Result&lt;安全字段&gt; ← LoginHandler ← 用户信息</div><p>餐厅做好菜以后，打包员只把客人需要的菜放进外卖盒。这里也先挑选用户编号和用户名，再放进结果盒子；数据库对象中的密码哈希留在服务端。</p><p>在 LoginHandler.java 的 import 区域加入：</p><pre><code>import com.first.common.Result;</code></pre><p>将已有的 login 方法替换为下面的方法。Map、HashMap、SysUser、PostMapping 和 RequestBody 沿用文件中已有的 import；不要在同一个类中保留两个相同的 /login 方法。</p><pre><code>@PostMapping("/login")
+public Result&lt;Map&lt;String, Object&gt;&gt; login(
+        @RequestBody Map&lt;String, String&gt; loginData) {
+    // 从请求正文取账号和密码。
+    String username = loginData.get("username");
+    String password = loginData.get("password");
+
+    // 交给业务层校验；通过后得到用户对象。
+    SysUser user = authService.login(username, password);
+
+    // 只挑选前端需要的信息。
+    Map&lt;String, Object&gt; data = new HashMap&lt;&gt;();
+    data.put("id", user.getId());
+    data.put("username", user.getUsername());
+
+    // 使用刚写好的方法，生成统一的成功回复。
+    return Result.success(data);
+}</code></pre><p>PostMapping 保留 POST /api/auth/login 的路径；RequestBody 让 Spring 从 JSON 正文读取键值；Map&lt;String, String&gt; 里是字符串键和值。Result&lt;Map&lt;String, Object&gt;&gt; 说明回复盒子的 data 是一个 Map，其值可以包含不同类型，例如数字编号与字符串用户名。</p><p>重启程序，用已有的 Postman 登录请求测试。正确账号和密码应得到含 code、msg、data 的 JSON，data 中只有 id 和 username。此阶段错误仍由现有代码抛出，统一错误处理留到后面。</p><footer><a href="index.html">返回教程首页</a></footer></article></main></div></body></html>
