@@ -1,0 +1,10 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>后台管理系统 P0：统一返回格式</title><link rel="stylesheet" href="style.css"></head><body><header><a class="brand" href="index.html">开发工具入门</a></header><div class="layout"><main><article><div class="eyebrow">管理系统 / P0</div><h1>第一步：给前端的回复，先装进一个盒子</h1><p class="lead">你的登录接口已经能收到账号密码，并把处理结果返回。我们接下来整理返回格式。</p><p>前端可能收到登录结果、用户列表或错误提示。每次都让它找相同的三个字段，代码就容易写：<code>code</code> 表示结果，<code>msg</code> 放提示，<code>data</code> 放具体内容。</p><div class="flow">Postman → LoginHandler 接收请求 → AuthService 检查 → Repository 查数据库<br>Postman ← LoginHandler 用 Result 装好回复 ← 检查结果</div><p>可以把 Result 想成一个外卖盒：盒上的标签总有状态和说明；盒子里可以装不同的内容。现在我们先做一个成功的盒子。</p><h2>先看你写好的盒子</h2><p>在 <code>Result.java</code> 中，<code>Result&lt;T&gt;</code> 的 T 给数据类型留位置。<code>Result&lt;String&gt;</code> 表示 data 装文字；<code>Result&lt;SysUser&gt;</code> 表示 data 装用户对象。</p><h2>再加一个装成功结果的方法</h2><p>在 <code>Result</code> 类里、三个字段后面加入这段方法：</p><pre><code>public static &lt;T&gt; Result&lt;T&gt; success(T data) {
+    // 先创建一个空盒子。
+    Result&lt;T&gt; result = new Result&lt;&gt;();
+    // 写上成功代码和提示。
+    result.code = 200;
+    result.msg = "成功";
+    // 把收到的数据放进盒子。
+    result.data = data;
+    return result;
+}</code></pre><p><code>public</code> 允许其他类调用；<code>static</code> 表示可以通过 <code>Result.success(...)</code> 调用，不必先在外面创建盒子。方法名前的 <code>&lt;T&gt;</code> 让这个静态方法自己声明数据类型；<code>Result&lt;T&gt;</code> 是返回类型，<code>T data</code> 是接收的数据，<code>return</code> 把装好的盒子交回调用者。</p><p>例如调用 <code>Result.success("登录成功")</code>，得到的 data 是文字。后续接口返回给前端时，会看到 code、msg、data 三个字段。我们下一步再把 LoginHandler 接上它。</p><div class="note"><strong>阅读进度：</strong>这一段只是在 Result 中新增方法。登录接口暂时不会自动改变；需要后续显式调用它。登录响应应选择安全字段，不能把密码哈希返回给前端。</div><footer><a href="index.html">返回教程首页</a></footer></article></main></div></body></html>
