@@ -24,4 +24,13 @@ public Result&lt;Map&lt;String, Object&gt;&gt; login(
 
     // 使用刚写好的方法，生成统一的成功回复。
     return Result.success(data);
-}</code></pre><p>PostMapping 保留 POST /api/auth/login 的路径；RequestBody 让 Spring 从 JSON 正文读取键值；Map&lt;String, String&gt; 里是字符串键和值。Result&lt;Map&lt;String, Object&gt;&gt; 说明回复盒子的 data 是一个 Map，其值可以包含不同类型，例如数字编号与字符串用户名。</p><p>重启程序，用已有的 Postman 登录请求测试。正确账号和密码应得到含 code、msg、data 的 JSON，data 中只有 id 和 username。此阶段错误仍由现有代码抛出，统一错误处理留到后面。</p><footer><a href="index.html">返回教程首页</a></footer></article></main></div></body></html>
+}</code></pre><p>PostMapping 保留 POST /api/auth/login 的路径；RequestBody 让 Spring 从 JSON 正文读取键值；Map&lt;String, String&gt; 里是字符串键和值。Result&lt;Map&lt;String, Object&gt;&gt; 说明回复盒子的 data 是一个 Map，其值可以包含不同类型，例如数字编号与字符串用户名。</p><p>重启程序，用已有的 Postman 登录请求测试。正确账号和密码应得到含 code、msg、data 的 JSON，data 中只有 id 和 username。此阶段错误仍由现有代码抛出，统一错误处理留到后面。</p><h2>给结果盒子加上失败的回复</h2><p>登录成功后，LoginHandler 已经使用 Result.success。接下来先给 Result 增加 error 方法，准备一个能放失败代码和提示的盒子。这个方法先定义，后面配置异常处理时再调用。</p><pre><code>public static &lt;T&gt; Result&lt;T&gt; error(int code, String msg) {
+    // 创建一个空的结果盒子
+    Result&lt;T&gt; result = new Result&lt;&gt;();
+    // 放入调用方给出的失败代码和提示
+    result.code = code;
+    result.msg = msg;
+    // 失败时暂时没有要返回的数据
+    result.data = null;
+    return result;
+}</code></pre><p>这段加在 Result 类里，和 success 方法并排。int code 和 String msg 是方法参数，由调用方提供；static 让其他类可以通过 Result.error 调用；&lt;T&gt; 与 Result&lt;T&gt; 让方法返回指定数据类型的结果。null 表示暂时没有数据。</p><p>例如 Result.error(400, "输入有误") 会创建一个失败结果。此时已有接口的错误响应还不会自动改变，后续要让异常处理器调用这个方法。登录校验时不要将数据库里的密码哈希写入日志。</p><footer><a href="index.html">返回教程首页</a></footer></article></main></div></body></html>
